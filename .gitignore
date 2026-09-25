@@ -49,6 +49,9 @@ coverage
 # --- Vercel ---
 .vercel
 
+# --- Download arsip workspace (berisi .env & db — JANGAN commit!) ---
+public/serbabisa-workspace-*.zip
+
 # --- Artefak sandbox internal (bukan bagian aplikasi) ---
 skills/
 tool-results/
