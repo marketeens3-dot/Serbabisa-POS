@@ -1,0 +1,304 @@
+// Serbabisa — Multi-tenant POS SaaS
+// PostgreSQL (Supabase): enum & Json tetap String + validasi Zod di lib/constants.ts & lib/validation.ts
+// Money = Int (rupiah, IDR tanpa subunit) → bebas floating point.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  passwordHash       String
+  fullName           String
+  phone              String?
+  role               String    @default("USER") // SUPER_ADMIN | USER (lib/constants.ts)
+  status             String    @default("ACTIVE") // ACTIVE | INACTIVE | SUSPENDED
+  tenantId           String?
+  tenant             Tenant?   @relation(fields: [tenantId], references: [id])
+  mustChangePassword Boolean   @default(false)
+  failedLoginAttempts Int      @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  refundedTransactions Transaction[] @relation("RefundedBy")
+  sessions           Session[]
+  transactions       Transaction[]      @relation("Cashier")
+  voidedTransactions Transaction[]      @relation("VoidedBy")
+  cashSessions       CashSession[]      @relation("CashSessionOpener")
+  auditLogs          AuditLog[]
+
+  @@index([tenantId])
+  @@index([role, status])
+  @@index([status])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Tenant {
+  id              String   @id @default(uuid())
+  businessName    String
+  slug            String   @unique
+  phone           String?
+  whatsappNumber  String?
+  address         String?
+  logoUrl         String?
+  currency        String   @default("IDR")
+  timezone        String   @default("Asia/Jakarta")
+  isActive        Boolean  @default(true)
+  invoiceSettings String   @default("{}") // JSON string: { whatsappTemplate, defaultPaymentMethod }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users            User[]
+  categories       Category[]
+  catalogItems     CatalogItem[]
+  customers        Customer[]
+  transactions     Transaction[]
+  cashSessions     CashSession[]
+  invoiceTemplates InvoiceTemplate[]
+  invoiceCounters  InvoiceCounter[]
+  auditLogs        AuditLog[]
+
+  @@index([isActive])
+}
+
+model Category {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items CatalogItem[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, isActive])
+}
+
+model CatalogItem {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type         String // PRODUCT | SERVICE
+  name         String
+  sku          String?
+  barcode      String?
+  description  String?
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  costPrice    Int      @default(0)
+  sellingPrice Int
+  stockQty     Float    @default(0)
+  minStockQty  Float    @default(0)
+  unit         String   @default("pcs")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactionItems TransactionItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, type, isActive])
+  @@index([tenantId, name])
+  @@index([categoryId])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String? // dinormalisasi 62xxx
+  email     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+  @@index([tenantId, isActive])
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  cashierId      String
+  cashier        User     @relation("Cashier", fields: [cashierId], references: [id])
+  cashSessionId  String?
+  cashSession    CashSession? @relation("CashSessionTx", fields: [cashSessionId], references: [id])
+  invoiceNumber  String
+  subtotal       Int
+  discountAmount Int      @default(0)
+  taxAmount      Int      @default(0)
+  totalAmount    Int
+  paidAmount     Int
+  changeAmount   Int
+  paymentMethod  String // CASH | TRANSFER | QRIS | OTHER
+  status         String   @default("COMPLETED") // COMPLETED | VOID | REFUNDED
+  notes          String?
+  voidReason     String?
+  voidedAt       DateTime?
+  voidedById     String?
+  voidedBy       User?    @relation("VoidedBy", fields: [voidedById], references: [id])
+  // Refund (parsial kumulatif; status REFUNDED saat seluruh item terrefund)
+  refundedAmount Int      @default(0)
+  refundReason   String?
+  refundedAt     DateTime?
+  refundedById   String?
+  refundedBy     User?    @relation("RefundedBy", fields: [refundedById], references: [id])
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items TransactionItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([customerId])
+  @@index([cashierId])
+  @@index([createdAt])
+}
+
+model TransactionItem {
+  id               String        @id @default(uuid())
+  transactionId    String
+  transaction      Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  catalogItemId    String?
+  catalogItem      CatalogItem?  @relation(fields: [catalogItemId], references: [id])
+  itemType         String // PRODUCT | SERVICE
+  itemNameSnapshot String
+  skuSnapshot      String?
+  quantity         Float
+  unitPrice        Int
+  subtotal         Int
+  refundedQty      Float        @default(0) // kumulatif qty yang direfund per item
+  createdAt        DateTime      @default(now())
+
+  @@index([transactionId])
+  @@index([catalogItemId])
+}
+
+model InvoiceCounter {
+  id         String @id @default(uuid())
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  year       Int
+  lastNumber Int    @default(0)
+
+  @@unique([tenantId, year])
+}
+
+// Jejak mutasi stok (blueprint FR-08): SALE mengurangi, VOID mengembalikan.
+model InventoryMovement {
+  id            String        @id @default(uuid())
+  tenantId      String
+  catalogItemId String
+  catalogItem   CatalogItem   @relation(fields: [catalogItemId], references: [id])
+  transactionId String?
+  transaction   Transaction?  @relation(fields: [transactionId], references: [id])
+  movementType  String // SALE | VOID_RETURN | REFUND_RETURN | ADJUSTMENT
+  quantity      Float // nilai positif; arah ditentukan movementType
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([catalogItemId])
+  @@index([transactionId])
+}
+
+// Sesi kasir (shift) — rekonsiliasi kas: kas awal + penjualan tunai vs hasil hitung fisik.
+model CashSession {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("CashSessionOpener", fields: [userId], references: [id])
+  openingCash Int       @default(0)
+  closingCash Int? // hasil hitung fisik kasir saat tutup
+  expectedCash Int? // openingCash + total penjualan tunai (snapshot saat tutup)
+  difference  Int? // closingCash - expectedCash (selisih; negatif = kurang)
+  status      String    @default("OPEN") // OPEN | CLOSED
+  notes       String?
+  openedAt    DateTime  @default(now())
+  closedAt    DateTime?
+
+  transactions Transaction[] @relation("CashSessionTx")
+
+  @@index([tenantId, status])
+  @@index([tenantId, userId, openedAt])
+  @@index([status])
+}
+
+model InvoiceTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  config    String // JSON InvoiceTemplateConfig (divalidasi Zod)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  actor        User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  action       String
+  resourceType String?
+  resourceId   String?
+  metadata     String? // JSON string — TIDAK BOLEH berisi kredensial/secret
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String // JSON string
+  updatedAt DateTime @updatedAt
+}

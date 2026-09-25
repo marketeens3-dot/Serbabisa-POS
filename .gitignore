@@ -1,0 +1,67 @@
+# ================================================================
+# Serbabisa POS — .gitignore produksi
+# Prinsip: SEMUA sekret & artefak lokal tidak masuk repo.
+# ================================================================
+
+# --- Dependencies ---
+node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# --- Next.js ---
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# --- Build ---
+/build
+server.log
+
+# --- Environment & SEKRET (JANGAN commit!) ---
+.env
+.env.*
+!.env.example
+*.pem
+
+# --- Database lokal (SQLite dev/backup) — produksi memakai Supabase ---
+db/
+*.db
+*.db-journal
+
+# --- Log & debug ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dev.log
+dev.out.log
+
+# --- Misc ---
+.DS_Store
+coverage
+
+# --- Vercel ---
+.vercel
+
+# --- Artefak sandbox internal (bukan bagian aplikasi) ---
+skills/
+tool-results/
+agent-ctx/
+download/
+examples/
+mini-services/
+.zscripts/
+tests/
+icons-backup/
+docs/
+worklog.md
+Caddyfile
+.claude
+.z-ai-config
+prompt
