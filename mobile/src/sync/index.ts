@@ -138,18 +138,19 @@ export async function syncNow(tenantId: string, force = false): Promise<SyncOutc
       await markOutboxDone(item.id);
       outcome.pushed++;
     } else {
-      // Galat OFFLINE tidak dihitung sebagai percobaan gagal: jaringan putus
-      // bukan kesalahan entri. Kalau ikut dihitung, penjualan yang menunggu
-      // berhari-hari akan habis jatah percobaannya dan berhenti dicoba ulang
-      // tepat saat koneksi finally pulih.
+      // Galat "server tak terjangkau" tidak dihitung sebagai percobaan gagal:
+      // jaringan putus atau proxy sedang 502/503/504 bukan kesalahan entri.
+      // Kalau ikut dihitung, penjualan yang menunggu berhari-hari akan habis
+      // jatah percobaannya dan berhenti dicoba ulang tepat saat koneksi
+      // finally pulih.
       await markOutboxFailed(item.id, `${res.error.code}: ${res.error.message}`, {
-        countAttempt: !res.error.isOffline,
+        countAttempt: !res.error.isUnreachable,
       });
       outcome.failed++;
-      if (res.error.isOffline) {
+      if (res.error.isUnreachable) {
         outcome.offline = true;
-        // Offline: berhenti di sini. Menyerang server yang tak terjangkau
-        // hanya memperpanjang waktu tunggu kasir.
+        // Tak terjangkau: berhenti di sini. Menyerang server yang tak
+        // terjangkau hanya memperpanjang waktu tunggu kasir.
         break;
       }
     }
@@ -195,7 +196,7 @@ export async function syncNow(tenantId: string, force = false): Promise<SyncOutc
       outcome.at = res.data.serverTime ?? outcome.at;
     } else {
       outcome.error = res.error.message;
-      outcome.offline = res.error.isOffline;
+      outcome.offline = res.error.isUnreachable;
     }
   }
 

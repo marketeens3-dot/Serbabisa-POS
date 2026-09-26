@@ -70,19 +70,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
+/**
+ * Tema fallback untuk pemakaian di luar provider.
+ *
+ * Dibuat SEKALI di level modul, bukan di dalam `useTheme()`. Kalau dibangun
+ * tiap pemanggilan, setiap render menghasilkan objek baru, sehingga
+ * `useMemo(() => makeStyles(theme), [theme])` di setiap layar tidak pernah
+ * kena cache — StyleSheet rebuilt terus-menerus tanpa alasan.
+ */
+const FALLBACK_THEME = buildTheme('light');
+const FALLBACK_VALUE: Ctx = {
+  theme: FALLBACK_THEME,
+  mode: 'light',
+  resolved: 'light',
+  setMode: () => undefined,
+  toggle: () => undefined,
+};
+
 export function useTheme(): Ctx {
   const ctx = useContext(ThemeContext);
   // Di luar provider, tetap mengembalikan tema terang supaya komponen tidak
   // pernah crash hanya karena lupa dibungkus provider.
-  if (!ctx) {
-    const fallbackTheme = buildTheme('light');
-    return {
-      theme: fallbackTheme,
-      mode: 'light',
-      resolved: 'light',
-      setMode: () => undefined,
-      toggle: () => undefined,
-    };
-  }
-  return ctx;
+  return ctx ?? FALLBACK_VALUE;
 }

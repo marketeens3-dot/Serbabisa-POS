@@ -107,7 +107,11 @@ export async function checkout(input: CheckoutInput): Promise<CheckoutResult> {
     await saveLocalTransaction(input.tenantId, {
       id: tx.id,
       invoiceNumber: tx.invoiceNumber,
-      totalAmount: Math.round(input.paidAmount) - computeTotals(input.lines, input.paidAmount).change,
+      // `totals.total` — bukan `paidAmount - totals.change`. Nilai latter
+      // memang sama sekarang, hanya karena `change` didefinisikan sebagai
+      // `paid - subtotal`: begitu ada biaya/kembalian/diskon, pengurangan
+      // ini diam-diam jadi salah, dan `totals` di atas justru tak terpakai.
+      totalAmount: totals.total,
       paidAmount: Math.round(input.paidAmount),
       status: 'COMPLETED',
       createdAt: new Date().toISOString(),
@@ -117,8 +121,12 @@ export async function checkout(input: CheckoutInput): Promise<CheckoutResult> {
     return { ok: true, invoiceNumber: tx.invoiceNumber, transactionId: tx.id, queued: false };
   }
 
-  // Galat offline → antre, jangan gagalkan kasir.
-  if (res.error.isOffline) {
+  // Server tak terjangkau (tidak ada jaringan, atau 502/503/504 dari proxy)
+  // → antre, jangan gagalkan kasir. Uang pelanggan sudah diterima; penjualan
+  // yang hilang berarti nota hilang tanpa jejak. 4xx lain (stok kurang,
+  // validasi, lockout) tetap ditampilkan apa adanya karena itu penolakan
+  // yang benar.
+  if (res.error.isUnreachable) {
     return queueOffline(input, body);
   }
 

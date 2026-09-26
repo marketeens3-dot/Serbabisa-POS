@@ -1,8 +1,12 @@
 // PATCH /api/admin/tenants/[id] — edit info toko / aktif-nonaktif.
 // Nonaktifkan toko → user di dalamnya dinonaktifkan + sesi dicabut.
+//
+// Pencabutan sesi dilakukan inline lewat `tx.session.deleteMany` DI DALAM
+// transaksi, bukan lewat helper `revokeAllSessions`. Helper itu bekerja di
+// luar transaksi, sehingga revocation bisa terhenti di tengah kalau
+// transaksinya batal. Import yang tersisa pernah membuat ini terlihat ambigu.
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { revokeAllSessions } from '@/lib/auth'
 import { ApiError, assertSameOrigin, getClientIp, getUserAgent, handleApiError, requireSuperAdmin } from '@/lib/api'
 import { logAudit } from '@/lib/audit'
 import { AUDIT_ACTIONS } from '@/lib/constants'

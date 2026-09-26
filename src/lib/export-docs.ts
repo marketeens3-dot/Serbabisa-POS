@@ -151,7 +151,20 @@ export async function renderXlsx(doc: ExportDoc): Promise<Uint8Array> {
         const idx = ci - 1 // ExcelJS 1-based
         const v = r[idx]
         if (typeof v === "number") {
-          cell.numFmt = qty.includes(idx) ? "#,##0.###" : "#,##0"
+          // `money` dulu dideklarasikan tapi TIDAK dipakai, sehingga kolom uang
+          // di XLSX sama sekali tidak ditandai — PDF-nya memakai `moneyStr`
+          // ("Rp 1.500") sementara sini muncul polos "1,500".  Awalan "Rp"
+          // ditulis sebagai literal terpetakan, jadi sel tetap angka murni:
+          // bisa dijumlahkan & diurutkan seperti seharusnya.
+          // Catatan: pemisah ribuan mengikuti lokalitas Excel pembaca.  Untuk
+          // gaya Indonesia (1.500) secara paksa, butuh tag `[$-id-ID]`, yang
+          // tidak bisa diverifikasi tanpa Excel — dicatat di worklog, bukan
+          // diklaim beres.
+          cell.numFmt = money.includes(idx)
+            ? '"Rp" #,##0'
+            : qty.includes(idx)
+              ? "#,##0.###"
+              : "#,##0"
           cell.alignment = { horizontal: "right" }
         }
         cell.border = { bottom: { style: "hair", color: { argb: GRID } } }

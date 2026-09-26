@@ -213,6 +213,13 @@ const PAIRS = [
   ['onFill di danger', 'onFill', 'danger', AA_TEXT, false],
   ['onFill di ok', 'onFill', 'ok', AA_TEXT, false],
   ['onFill di warn', 'onFill', 'warn', AA_TEXT, false],
+  // Diambil dari pemakaian nyata di komponen, bukan tebakan:
+  // `app/(tabs)/_layout.tsx` mewarnai tab bar dengan C.primary / C.textFaint
+  // di atas C.surface. Label tab 11px bold → bukan "large text", jadi tetap 4,5:1.
+  ['tab bar aktif', 'primary', 'surface', AA_TEXT, false],
+  ['tab bar tidak aktif', 'textFaint', 'surface', AA_TEXT, false],
+  // `components.tsx` `Field`: hint kecil memakai C.textFaint di atas kartu.
+  ['hint isian di kartu', 'textFaint', 'surface', AA_TEXT, false],
 ];
 
 const SOFT_PAIRS = [
@@ -259,6 +266,24 @@ for (const mode of ['light', 'dark']) {
     if (ratio < min) {
       failures.push(
         `tema ${mode}: KONTRAS "${key}" ${fmt(ratio)} < ${min}:1 (fg="${s.fg}" bg="${s.bg}")`
+      );
+    }
+  }
+
+  // `components.tsx` `Banner`: judul memakai tone.fg di atas tone.bg, tapi
+  // ISI pesan memakai C.text (warna teks halaman) di atas latar ber-tone.
+  // C.text cukup gelap-terang sehingga kebetulan lolos, tapi tidak
+  // dijamin — diuji agar tetap begitu bila palet berubah.
+  for (const tone of ['info', 'warn', 'danger', 'ok']) {
+    const s = t.soft[tone];
+    if (!s) continue;
+    const ratio = contrast(t.C.text, s.bg, t.C.surface);
+    if (ratio === null) continue;
+    checked++;
+    if (ratio < AA_TEXT) {
+      failures.push(
+        `tema ${mode}: KONTRAS "isi Banner tone=${tone}" ${fmt(ratio)} < ${AA_TEXT}:1 ` +
+          `(C.text="${t.C.text}" di soft.${tone}.bg="${s.bg}")`
       );
     }
   }

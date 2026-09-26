@@ -41,6 +41,22 @@ export async function setServerUrl(url: string): Promise<void> {
   await setMeta(STORAGE_KEYS.serverUrl, stripTrailingSlash(url.trim()));
 }
 
+/**
+ * Status yang berarti server sedang tidak bisa dipakai — BUKAN penolakan atas
+ * isi permintaan.
+ *
+ * 408  Request Timeout — server tidak selesai memproses.
+ * 502  Bad Gateway      — reverse proxy (Caddy/Nginx/Vercel) gagal menjangkau
+ *                         origin.
+ * 503  Service Unavailable — origin sedang restart / maintenance.
+ * 504  Gateway Timeout  — origin tidak menjawab dalam batas proxy.
+ *
+ * 429 (Too Many Requests) SENGAJA tidak ikut: itu keputusan server atas
+ * permintaan, dan mengantre tanpa batas justru memperburuk. Likewise 4xx lain
+ * dan 500 — semuanya penolakan nyata yang harus tampil ke kasir.
+ */
+const UNREACHABLE_STATUS = new Set([408, 502, 503, 504]);
+
 /** Galat API yang membawa pesan dari server agar bisa ditampilkan ke kasir. */
 export class ApiError extends Error {
   constructor(
@@ -55,6 +71,19 @@ export class ApiError extends Error {
   /** Galat yang Meaning-nya "tidak ada internet", bukan "server rusak". */
   get isOffline(): boolean {
     return this.status === 0;
+  }
+
+  /**
+   * Server tidak bisa dipakai sekarang: tidak ada jaringan, atau jaringan ada
+   * tapi server/proxy sedang gagal.
+   *
+   * Dipisahkan dari `isOffline` karena bedanya penting secara bisnis. zeroes
+   * berarti tidak ada jalur sama sekali; 502/503/504 sering hanya sesaat, dan
+   * penjualan HARUS tetap diantrekan — uang pelanggan sudah diterima, dan
+   * `idempotencyKey` membuat pengiriman ulang aman.
+   */
+  get isUnreachable(): boolean {
+    return this.status === 0 || UNREACHABLE_STATUS.has(this.status);
   }
 }
 
@@ -124,7 +153,8 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
     return { ok: true, data: data as T };
   } catch (err) {
     // AbortError = timeout; TypeError = tidak ada jaringan. Keduanya kondisi
-    // OFFLINE, bukan bug — pesannya harus\Migration ke kasir, bukan "error".
+    // OFFLINE, bukan bug — pesannya harus diterjemahkan ke bahasa kasir,
+    // bukan "!('error')" mentah.
     const isAbort = err instanceof Error && err.name === 'AbortError';
     const offline = isAbort || err instanceof TypeError;
     return {

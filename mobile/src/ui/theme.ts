@@ -139,7 +139,12 @@ export function buildTheme(mode: 'light' | 'dark'): Theme {
     borderStrong: isDark ? 'rgba(255, 255, 255, 0.22)' : '#D3D3CF',
     text: p.foreground,
     textMuted: p.mutedForeground,
-    textFaint: isDark ? '#6E6E75' : '#8A8A90',
+    // Level paling redup, tapi tetap di atas 4,5:1. Nilai lama (#8A8A90 terang /
+    // #6E6E75 gelap) hanya 3,4:1, padahal dipakai untuk label tab yang
+    // kasir baca terus-menerus, placeholder pencarian, dan total nota yang
+    // dicoret saat void — semuanya isi, bukan hiasan.
+    // Sisakan margin di atas 4,5 supaya tidak rapuh terhadap pembulatan.
+    textFaint: isDark ? '#85858C' : '#75757A',
     danger: p.destructive,
     dangerSoft: isDark ? 'rgba(255, 100, 103, 0.15)' : '#FDECEC',
     warn: p.warning,
