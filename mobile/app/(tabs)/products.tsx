@@ -19,11 +19,18 @@ import {
   type Category,
 } from '../../src/db/repo';
 import { Button, EmptyState, Pill } from '../../src/ui/components';
-import { C, num, radius, rupiah, space } from '../../src/ui/theme';
+import { num, radius, rupiah, space } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 type Tab = 'all' | 'PRODUCT' | 'SERVICE';
 
 export default function ProductsScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const insets = useSafeAreaInsets();
   const tenantId = useAppStore((s) => s.user?.tenant?.id ?? '');
 
@@ -90,14 +97,14 @@ export default function ProductsScreen() {
               onPress={() => setTab(t.key)}
               style={[s.tab, tab === t.key && s.tabActive]}
             >
-              <Text style={[s.tabText, tab === t.key && { color: '#fff' }]}>{t.label}</Text>
+              <Text style={[s.tabText, tab === t.key && { color: C.onFill }]}>{t.label}</Text>
             </Pressable>
           ))}
           <Pressable
             onPress={() => setLowOnly((v) => !v)}
             style={[s.tab, lowOnly && { backgroundColor: C.warn, borderColor: C.warn }]}
           >
-            <Text style={[s.tabText, lowOnly && { color: '#fff' }]}>Stok menipis</Text>
+            <Text style={[s.tabText, lowOnly && { color: C.onFill }]}>Stok menipis</Text>
           </Pressable>
         </View>
         {categories.length > 0 ? (
@@ -106,7 +113,7 @@ export default function ProductsScreen() {
               onPress={() => setCategoryId(null)}
               style={[s.chip, categoryId === null && s.chipActive]}
             >
-              <Text style={[s.chipText, categoryId === null && { color: '#fff' }]}>Semua kategori</Text>
+              <Text style={[s.chipText, categoryId === null && { color: C.onFill }]}>Semua kategori</Text>
             </Pressable>
             {categories.map((c) => (
               <Pressable
@@ -114,7 +121,7 @@ export default function ProductsScreen() {
                 onPress={() => setCategoryId(categoryId === c.id ? null : c.id)}
                 style={[s.chip, categoryId === c.id && s.chipActive]}
               >
-                <Text style={[s.chipText, categoryId === c.id && { color: '#fff' }]}>{c.name}</Text>
+                <Text style={[s.chipText, categoryId === c.id && { color: C.onFill }]}>{c.name}</Text>
               </Pressable>
             ))}
           </View>
@@ -172,7 +179,7 @@ export default function ProductsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

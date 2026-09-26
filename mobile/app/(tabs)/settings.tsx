@@ -1,15 +1,15 @@
-/**
+﻿/**
  * Tab Pengaturan.
  *
- * Fokus: hal yang benar-benar dibutuhkan kasir di tempat —
+ * Fokus: hal yang benar-benar dibutuhkan kasir di tempat â€”
  * status sinkronisasi, ganti server, keluar.
  *
  * Laporan sengaja tidak ada di sini. Laporan butuh data lengkap seluruh
  * periode; dari HP yang sering offline, angkanya bisa tampak komplet padahal
- * belum. Kasir yang butuh laporan membuka versi web — lebih jujur daripada
+ * belum. Kasir yang butuh laporan membuka versi web â€” lebih jujur daripada
  * menampilkan angka yang belum tentu benar.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -18,7 +18,9 @@ import { pingServer, getServerUrl } from '../../src/api/client';
 import { syncNow, lastSyncAt } from '../../src/sync';
 import { failedOutbox, failedOutboxCount, outboxCount, type OutboxItem } from '../../src/db';
 import { Button, Card, Banner, Pill, Row } from '../../src/ui/components';
-import { C, radius, rupiah, sejakID, space, waktuID } from '../../src/ui/theme';
+import { radius, rupiah, sejakID, space, waktuID } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 /** Ringkas satu entri gagal menjadi kalimat yang bisa dipahami kasir. */
 function jelaskan(item: OutboxItem): { judul: string; detail: string } {
@@ -32,6 +34,11 @@ function jelaskan(item: OutboxItem): { judul: string; detail: string } {
 }
 
 export default function SettingsScreen() {
+  const { theme, setMode } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const insets = useSafeAreaInsets();
   const { user, sync, setSyncing, setSyncResult, refreshPending, logout, serverUrl, setServer } =
     useAppStore();
@@ -52,7 +59,7 @@ export default function SettingsScreen() {
 
   // Muat ulang saat layar difokuskan. Status sinkronisasi dan daftar penjualan
   // gagal harus selalu yang terbaru saat kasir membuka Pengaturan untuk
-  // memeriksa — bukan nilai yang dibekukan sejak aplikasi dibuka.
+  // memeriksa â€” bukan nilai yang dibekukan sejak aplikasi dibuka.
   useFocusEffect(
     useCallback(() => {
       void refresh();
@@ -101,7 +108,7 @@ export default function SettingsScreen() {
     >
       <Text style={s.title}>Pengaturan</Text>
 
-      {/* Status sinkronisasi — bagian paling penting di layar ini. */}
+      {/* Status sinkronisasi â€” bagian paling penting di layar ini. */}
       <Card style={{ gap: space(3) }}>
         <View style={s.cardHead}>
           <Text style={s.cardTitle}>Sinkronisasi</Text>
@@ -119,14 +126,14 @@ export default function SettingsScreen() {
         {message ? <Banner tone={message.tone} title="Status" message={message.text} /> : null}
         <View style={{ flexDirection: 'row', gap: space(2) }}>
           <Button
-            label={sync.syncing ? 'Sinkron…' : 'Sinkron sekarang'}
+            label={sync.syncing ? 'Sinkronâ€¦' : 'Sinkron sekarang'}
             onPress={doSync}
             loading={sync.syncing}
             style={{ flex: 1 }}
             testID="sync-now"
           />
           <Button
-            label={checking ? 'Uji…' : 'Uji server'}
+            label={checking ? 'Ujiâ€¦' : 'Uji server'}
             variant="secondary"
             onPress={testConnection}
             loading={checking}
@@ -137,7 +144,7 @@ export default function SettingsScreen() {
 
       {/* Penjualan yang gagal naik. Bagian paling penting di layar ini setelah
           status sinkronisasi: ini berarti uang sudah diterima tapi belum
-          tercatat — kasir WAJIB melihatnya, bukan sekadar baris angka. */}
+          tercatat â€” kasir WAJIB melihatnya, bukan sekadar baris angka. */}
       {failed.length > 0 ? (
         <Card style={{ gap: space(3), borderColor: C.danger, borderWidth: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -146,7 +153,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={s.hint}>
             Data berikut tidak berhasil dikirim ke server. Untuk penjualan,
-            uang pelanggan sudah diterima tetapi nota belum tercatat — catat
+            uang pelanggan sudah diterima tetapi nota belum tercatat â€” catat
             manual di aplikasi web, atau perbaiki masalahnya lalu kirim ulang.
           </Text>
           {failed.map((f) => {
@@ -171,6 +178,29 @@ export default function SettingsScreen() {
       ) : null}
 
       <Card style={{ gap: space(2) }}>
+        <Text style={s.cardTitle}>Tampilan</Text>
+        <Text style={s.hint}>
+          Mode gelap memakai warna yang sama dengan aplikasi web, supaya layar tidak menyilaukan saat shift malam di gudang.
+        </Text>
+        <View style={{ flexDirection: 'row', gap: space(2) }}>
+          <Button
+            label="Terang"
+            variant={theme.mode === 'light' ? 'primary' : 'secondary'}
+            onPress={() => setMode('light')}
+            style={{ flex: 1 }}
+            testID="theme-light"
+          />
+          <Button
+            label="Gelap"
+            variant={theme.mode === 'dark' ? 'primary' : 'secondary'}
+            onPress={() => setMode('dark')}
+            style={{ flex: 1 }}
+            testID="theme-dark"
+          />
+        </View>
+      </Card>
+
+      <Card style={{ gap: space(2) }}>
         <Text style={s.cardTitle}>Akun</Text>
         <Row label="Nama" value={user?.fullName ?? '-'} />
         <Row label="Email" value={user?.email ?? '-'} />
@@ -182,7 +212,7 @@ export default function SettingsScreen() {
         <Text style={s.cardTitle}>Server</Text>
         <Text style={s.hint}>
           Alamat server tidak bisa diubah dari sini. Kasir yang salah ketik cukup
-          menekan tombol di bawah — data di perangkat tidak akan hilang.
+          menekan tombol di bawah â€” data di perangkat tidak akan hilang.
         </Text>
         <Button
           label="Ubah alamat server"
@@ -200,7 +230,7 @@ export default function SettingsScreen() {
           Aplikasi ini bekerja tanpa internet. Penjualan tetap tercatat di perangkat
           dan dikirim otomatis begitu ada koneksi.
         </Text>
-        <Text style={s.version}>Serbabisa POS untuk HP · versi 1.0.0</Text>
+        <Text style={s.version}>Serbabisa POS untuk HP Â· versi 1.0.0</Text>
       </Card>
 
       <Button
@@ -228,7 +258,7 @@ export default function SettingsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   title: { fontSize: 18, fontWeight: '800', color: C.text },
   cardTitle: { fontSize: 15, fontWeight: '800', color: C.text },

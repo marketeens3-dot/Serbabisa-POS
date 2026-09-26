@@ -6,7 +6,7 @@
  * karena kasir sering menerima pelanggan baru di kasir dan harus mencatatnya
  * seketika, bukan menunggu sampai ada wifi.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,9 @@ import { enqueue } from '../../src/db';
 import { api } from '../../src/api/client';
 import { syncNow } from '../../src/sync';
 import { Button, Card, EmptyState, Field, Banner } from '../../src/ui/components';
-import { C, radius, space } from '../../src/ui/theme';
+import { radius, space } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 /** Normalisasi nomor telepon Indonesia ke format 62xxx — sama seperti server. */
 function normalisasiTelepon(raw: string): string | null {
@@ -37,6 +39,11 @@ function normalisasiTelepon(raw: string): string | null {
 }
 
 export default function CustomersScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const insets = useSafeAreaInsets();
   const { user, refreshPending } = useAppStore();
   const tenantId = user?.tenant?.id ?? '';
@@ -189,7 +196,7 @@ export default function CustomersScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

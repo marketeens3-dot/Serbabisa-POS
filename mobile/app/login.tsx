@@ -9,7 +9,7 @@
  *     menampilkan pesan yang sangat berbeda supaya kasir tidak mengira
  *     passwordnya rusak padahal jaringan yang bermasalah.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,9 +17,16 @@ import { useAppStore } from '../src/store';
 import { pingServer, getServerUrl } from '../src/api/client';
 import { syncNow } from '../src/sync';
 import { Button, Card, Field, Banner, Pill } from '../src/ui/components';
-import { C, radius, space } from '../src/ui/theme';
+import { radius, space } from '../src/ui/theme';
+import type { Theme } from '../src/ui/theme';
+import { useTheme } from '../src/ui/theme-provider';
 
 export default function LoginScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { login, setServer, serverUrl, user } = useAppStore();
@@ -194,7 +201,7 @@ export default function LoginScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   scroll: { paddingHorizontal: space(5), gap: space(4) },
   brand: { alignItems: 'center', gap: space(2), marginBottom: space(2) },
   mark: {
@@ -205,7 +212,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  markText: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  markText: { color: C.onFill, fontSize: 30, fontWeight: '900' },
   title: { color: C.text, fontSize: 22, fontWeight: '800', marginTop: space(2) },
   sub: { color: C.textMuted, fontSize: 13.5 },
   serverToggle: { alignItems: 'center', paddingVertical: space(2) },

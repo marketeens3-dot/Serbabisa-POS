@@ -2,22 +2,30 @@
  * Komponen UI dasar.
  *
  * Ditulis tanpa pustaka UI karena Expo Go membatasi modul native: pustaka
- * componentUI yang berat biasanya menarik dependensi native di luar Expo SDK.
- * Komponen di sini hanya memakai React Native inti + SafeAreaContext, keduanya
+ * component UI yang berat biasanya menarik dependensi native di luar Expo SDK.
+ * Komponen di sini hanya memakai React Native inti + AsyncStorage, semuanya
  * sudah ada di Expo Go.
+ *
+ * Bahasa visualnya mengikuti aplikasi web (src/app/globals.css): primary biru,
+ * radius 10px, kartu nyaris solid dengan border tipis, dan mode gelap yang
+ * mengikuti token yang sama. Warna diambil lewat `useTheme()`, BUKAN konstanta,
+ * sehingga seluruh komponen ikut berubah saat mode diganti.
+ *
+ * API setiap komponen sengaja TIDAK diubah supaya file layar yang sudah ada
+ * tidak perlu disentuh hanya karena restyle.
  */
 import React from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   TextInput,
   TextInputProps,
   View,
   ViewStyle,
 } from 'react-native';
-import { C, radius, rupiah, space } from './theme';
+import { rupiah } from './theme';
+import { useTheme } from './theme-provider';
 
 type ButtonProps = {
   label: string;
@@ -40,17 +48,33 @@ export function Button({
   style,
   testID,
 }: ButtonProps) {
+  const { theme } = useTheme();
+  const { C, radius } = theme;
   const isDisabled = disabled || loading;
-  const bg =
-    variant === 'primary'
-      ? C.primary
-      : variant === 'danger'
-        ? C.danger
-        : variant === 'secondary'
-          ? C.surface
-          : 'transparent';
-  const fg = variant === 'primary' || variant === 'danger' ? '#fff' : C.text;
+
+  // Primary = biru solid. Secondary = permukaan + border (bukan outline tipis
+  // seperti versi lama, supaya kontrasnya terbaca di layar HP).
+  let bg: string = C.primary;
+  let fg: string = C.primaryForeground;
+  let borderColor = 'transparent';
+
+  if (variant === 'danger') {
+    bg = C.danger;
+    // Bukan putih: `C.onFill` benar di kedua mode. Putih di atas merah
+    // mode gelap hanya ~2,9:1, jadi teks tombol hapus jadi tak terbaca.
+    fg = C.onFill;
+  } else if (variant === 'secondary') {
+    bg = C.card;
+    fg = C.text;
+    borderColor = C.borderStrong;
+  } else if (variant === 'ghost') {
+    bg = 'transparent';
+    fg = C.textMuted;
+  }
+
   const pad = size === 'lg' ? 16 : size === 'sm' ? 8 : 12;
+  // Target sentuh: shadcn web memakai h-9/h-10; di HP minimal 44px.
+  const minHeight = size === 'lg' ? 52 : size === 'sm' ? 36 : 46;
 
   return (
     <Pressable
@@ -64,19 +88,21 @@ export function Button({
           paddingVertical: pad,
           paddingHorizontal: pad + 6,
           borderRadius: radius.md,
+          minHeight,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: isDisabled ? 0.55 : pressed ? 0.85 : 1,
-          borderWidth: variant === 'secondary' ? 1 : 0,
-          borderColor: C.borderStrong,
+          opacity: isDisabled ? 0.5 : pressed ? 0.88 : 1,
+          borderWidth: borderColor === 'transparent' ? 0 : 1,
+          borderColor,
           flexDirection: 'row',
           gap: 8,
         },
+        variant === 'primary' || variant === 'danger' ? { shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 } : null,
         style,
       ]}
     >
       {loading ? <ActivityIndicator size="small" color={fg} /> : null}
-      <Text style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15 }}>
+      <Text style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15, letterSpacing: 0.1 }}>
         {label}
       </Text>
     </Pressable>
@@ -90,14 +116,29 @@ type FieldProps = TextInputProps & {
 };
 
 export function Field({ label, hint, error, style, ...rest }: FieldProps) {
+  const { theme } = useTheme();
+  const { C, radius, space } = theme;
   return (
     <View style={{ gap: 6, width: '100%' }}>
-      {label ? <Text style={s.label}>{label}</Text> : null}
+      {label ? <Text style={{ color: C.textMuted, fontSize: 13, fontWeight: '600' }}>{label}</Text> : null}
       <TextInput
         placeholderTextColor={C.textFaint}
         style={[
-          s.input,
-          error ? { borderColor: C.danger, backgroundColor: C.dangerSoft } : null,
+          {
+            backgroundColor: C.card,
+            borderWidth: 1,
+            // Web memakai border 1px + ring subtle; di sini borderThickness
+            // Native 1px sudah setara, dan warna input lebih tegas agar tidak
+            // "menyatu" dengan latar (temuan QA waktu lalu).
+            borderColor: error ? C.danger : C.input,
+            borderRadius: radius.md,
+            paddingHorizontal: space(3),
+            paddingVertical: space(3),
+            fontSize: 15,
+            color: C.text,
+            minHeight: 46,
+          },
+          error ? { backgroundColor: C.dangerSoft } : null,
           style,
         ]}
         {...rest}
@@ -118,7 +159,25 @@ export function Card({
   children: React.ReactNode;
   style?: ViewStyle;
 }) {
-  return <View style={[s.card, style]}>{children}</View>;
+  const { theme } = useTheme();
+  const { C, radius, space } = theme;
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: C.card,
+          borderRadius: radius.lg,
+          borderWidth: 1,
+          borderColor: C.border,
+          padding: space(4),
+          gap: space(3),
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function EmptyState({
@@ -130,21 +189,15 @@ export function EmptyState({
   hint?: string;
   action?: React.ReactNode;
 }) {
+  const { theme } = useTheme();
+  const { C, space } = theme;
   return (
-    <View style={s.empty}>
+    <View style={{ padding: space(10), alignItems: 'center', justifyContent: 'center', gap: space(2) }}>
       <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, textAlign: 'center' }}>
         {title}
       </Text>
       {hint ? (
-        <Text
-          style={{
-            color: C.textMuted,
-            fontSize: 13,
-            textAlign: 'center',
-            marginTop: 6,
-            lineHeight: 19,
-          }}
-        >
+        <Text style={{ color: C.textMuted, fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 19 }}>
           {hint}
         </Text>
       ) : null}
@@ -154,10 +207,12 @@ export function EmptyState({
 }
 
 export function Loading({ label = 'Memuat…' }: { label?: string }) {
+  const { theme } = useTheme();
+  const { C, space } = theme;
   return (
-    <View style={s.empty}>
+    <View style={{ padding: space(10), alignItems: 'center', justifyContent: 'center', gap: space(2) }}>
       <ActivityIndicator color={C.primary} />
-      <Text style={{ color: C.textMuted, marginTop: space(3), fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: C.textMuted, marginTop: space(2), fontSize: 13 }}>{label}</Text>
     </View>
   );
 }
@@ -173,20 +228,28 @@ export function Banner({
   message?: string;
   action?: React.ReactNode;
 }) {
-  const map = {
-    info: { bg: C.infoSoft, fg: C.info },
-    warn: { bg: C.warnSoft, fg: C.warn },
-    danger: { bg: C.dangerSoft, fg: C.danger },
-    ok: { bg: C.okSoft, fg: C.ok },
-  } as const;
-  const t = map[tone];
+  const { theme } = useTheme();
+  const { C, radius, space } = theme;
+  const t = theme.soft[tone];
   return (
-    <View style={[s.banner, { backgroundColor: t.bg, borderColor: t.fg }]}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space(3),
+        backgroundColor: t.bg,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        // Border mengikuti tone, bukan teks — version web memakai border subtle
+        // + aksen kiri tebal.
+        borderColor: t.fg,
+        borderLeftWidth: 4,
+        padding: space(3),
+      }}
+    >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: t.fg, fontWeight: '800', fontSize: 13 }}>{title}</Text>
-        {message ? (
-          <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }}>{message}</Text>
-        ) : null}
+        {message ? <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }}>{message}</Text> : null}
       </View>
       {action}
     </View>
@@ -200,16 +263,19 @@ export function Pill({
   label: string;
   tone?: 'neutral' | 'ok' | 'warn' | 'danger' | 'info';
 }) {
-  const map = {
-    neutral: { bg: C.surfaceAlt, fg: C.textMuted },
-    ok: { bg: C.okSoft, fg: C.ok },
-    warn: { bg: C.warnSoft, fg: C.warn },
-    danger: { bg: C.dangerSoft, fg: C.danger },
-    info: { bg: C.infoSoft, fg: C.info },
-  } as const;
-  const t = map[tone];
+  const { theme } = useTheme();
+  const { C, space } = theme;
+  const t = theme.soft[tone];
   return (
-    <View style={[s.pill, { backgroundColor: t.bg }]}>
+    <View
+      style={{
+        paddingHorizontal: space(2),
+        paddingVertical: 3,
+        borderRadius: 999,
+        alignSelf: 'flex-start',
+        backgroundColor: t.bg,
+      }}
+    >
       <Text style={{ color: t.fg, fontSize: 11.5, fontWeight: '700' }}>{label}</Text>
     </View>
   );
@@ -227,15 +293,18 @@ export function Row({
   strong?: boolean;
   tone?: 'default' | 'danger' | 'ok';
 }) {
+  const { theme } = useTheme();
+  const { C } = theme;
   const color = tone === 'danger' ? C.danger : tone === 'ok' ? C.ok : C.text;
   return (
-    <View style={s.row}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 3 }}>
       <Text style={{ color: C.textMuted, fontSize: 13.5, flex: 1 }}>{label}</Text>
       <Text
         style={{
           color,
           fontSize: strong ? 16 : 13.5,
           fontWeight: strong ? '800' : '600',
+          fontVariant: ['tabular-nums'],
         }}
       >
         {value}
@@ -245,71 +314,14 @@ export function Row({
 }
 
 export function KeypadHint({ total, change }: { total: number; change: number }) {
+  const { theme } = useTheme();
+  const { C } = theme;
   const good = change >= 0;
   return (
     <View style={{ gap: 4 }}>
       <Row label="Total" value={rupiah(total)} />
-      <Row
-        label="Kembalian"
-        value={rupiah(change)}
-        strong
-        tone={good ? 'ok' : 'danger'}
-      />
-      {!good ? (
-        <Text style={{ color: C.danger, fontSize: 12 }}>
-          Uang pembayaran kurang dari total.
-        </Text>
-      ) : null}
+      <Row label="Kembalian" value={rupiah(change)} strong tone={good ? 'ok' : 'danger'} />
+      {!good ? <Text style={{ color: C.danger, fontSize: 12 }}>Uang pembayaran kurang dari total.</Text> : null}
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  label: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  input: {
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: radius.md,
-    paddingHorizontal: space(3),
-    paddingVertical: space(3),
-    fontSize: 15,
-    color: C.text,
-    minHeight: 46,
-  },
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: space(4),
-    gap: space(3),
-  },
-  empty: {
-    padding: space(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space(2),
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space(3),
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    padding: space(3),
-  },
-  pill: {
-    paddingHorizontal: space(2),
-    paddingVertical: 3,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space(3),
-    paddingVertical: 3,
-  },
-});

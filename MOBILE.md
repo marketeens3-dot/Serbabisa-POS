@@ -323,11 +323,14 @@ node scripts/check-expo-go.mjs
 # 3. Tidak ada error TypeScript
 npm run typecheck
 
-# 4. Bundel benar-benar bisa dibangun untuk KEDUA platform
+# 4. Tema benar-benar bisa dimuat + kontrasnya memenuhi WCAG AA
+node --disable-warning=ExperimentalWarning scripts/check-theme.mjs
+
+# 5. Bundel benar-benar bisa dibangun untuk KEDUA platform
 npx expo export --platform android --platform ios --output-dir dist-verify
 ```
 
-Nomor 4 adalah pembuktian yang paling jujur: ia menangkap import yang hilang,
+Nomor 5 adalah pembuktian yang paling jujur: ia menangkap import yang hilang,
 modul native di luar Expo Go, dan kesalahan bundling apa pun. Hal itu tidak
 akan terlihat dari `tsc` saja. Hasil terakhir di mesin ini:
 
@@ -337,12 +340,39 @@ Android Bundled  1291 modules  -> 2.9 MB
 expo-doctor      21/21 checks passed
 ```
 
+Nomor 4 menutup kelas bug yang `tsc` dan `expo export` sama-sama tidak
+tangkap: **error saat modul dievaluasi**. `src/ui/theme.ts` pernah memanggil
+`buildTheme()` di baris `export const C = ...` sementara `radius`/`space` baru
+dideklarasikan di bawahnya, sehingga muncul `ReferenceError: Cannot access
+'radius' before initialization` tepat saat aplikasi start — seluruh layar gagal
+render, sementara typecheck tetap hijau. Skrip itu meng-import modul sungguhan
+dan memeriksa 50 pasangan kontras WCAG AA di mode terang maupun gelap.
+
+### Penyimpangan sadar dari palet web
+
+Warna aplikasi HP pada dasarnya disalin dari token CSS web
+(`src/app/globals.css`) supaya kasir tidak merasa berada di aplikasi yang
+berbeda. Tapi tiga warna **sengaja** digelapkan karena versi web tidak
+memenuhi WCAG AA dan HP dipakai di ruangan terang:
+
+| Token | Web | Mobile (terang) | Alasan |
+| --- | --- | --- | --- |
+| `warning` | `#E27100` | `#B05800` | amber di atas krem hanya 2,92:1; badge "Stok menipis" jadi sulit dibaca |
+| `success` | `#009966` | `#007F55` | 3,29:1 → 4,54:1 |
+| `destructive` | `#E7000B` | `#DB000A` | 4,18:1 → 4,58:1 |
+
+Hue-nya sama, hanya digelapkan secukupnya. `border` dekoratif sengaja
+**tidak** diangkakan ke 3:1 — WCAG 1.4.11 tidak mensyaratkan kontras untuk
+dekorasi — tapi `input`, yang garisnya satu-satunya penanda kolom bisa diketik,
+dinaikkan ke 3:1. Kalau Anda ingin web menyusul, nilai-nilai ini targetnya.
+
 Bisa juga memakai skrip dari folder project utama:
 
 ```bash
 npm run mobile:doctor     # expo-doctor
 npm run mobile:check      # allowlist Expo Go
 npm run mobile:typecheck  # TypeScript
+npm run mobile:theme      # smoke test tema + audit kontras WCAG
 npm run mobile:export     # bundle android + ios
 ```
 

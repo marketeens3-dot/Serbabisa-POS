@@ -38,6 +38,7 @@
     "desktop:pack": "node scripts/build-desktop.mjs --skip-next-build && electron-builder --dir --config electron-builder.yml",
     "desktop:dist": "node scripts/build-desktop.mjs --skip-next-build && electron-builder --config electron-builder.yml",
     "mobile:check": "node mobile/scripts/check-expo-go.mjs",
+    "mobile:theme": "node --disable-warning=ExperimentalWarning mobile/scripts/check-theme.mjs",
     "mobile:typecheck": "cd mobile && npx tsc --noEmit",
     "mobile:doctor": "cd mobile && npx expo-doctor",
     "mobile:export": "cd mobile && npx expo export --platform android --platform ios --output-dir dist-verify",

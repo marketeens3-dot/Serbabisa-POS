@@ -7,10 +7,12 @@
  * angka yang belum lengkap. Laporan tetap tersedia di Pengaturan → "Lihat di
  * browser".
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { Text, View, StyleSheet, Platform, type ColorValue } from 'react-native';
-import { C, space } from '../../src/ui/theme';
+import { space } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 // `color` bertipe ColorValue, bukan string: expo-router meneruskan warna tab
 // yang bisa berupa token transparan. Menyempitkan ke string akan membuat
@@ -25,6 +27,11 @@ type IconProps = { color: ColorValue; focused: boolean; size: number };
  * sehingga aplikasi akan crash saat dibuka. Glyph teks selalu aman.
  */
 function TabIcon({ glyph, ...rest }: IconProps & { glyph: string }) {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   return (
     <View style={s.iconWrap}>
       <Text
@@ -41,6 +48,11 @@ function TabIcon({ glyph, ...rest }: IconProps & { glyph: string }) {
 }
 
 export default function TabsLayout() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   return (
     <Tabs
       screenOptions={{
@@ -96,6 +108,6 @@ export default function TabsLayout() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   iconWrap: { alignItems: 'center', justifyContent: 'center', minHeight: 22, paddingTop: space(1) },
 });

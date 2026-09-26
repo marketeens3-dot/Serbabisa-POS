@@ -4,18 +4,23 @@
  * Bertanggung jawab: boot database + recovery sesi sebelum layar apa pun
  * dirender. Tanpa ini, layar pertama akan memproses `booted === false` dan
  * berkedip atau bahkan crash.
+ *
+ *Di sini juga dipasang ThemeProvider, jadi seluruh layar (termasuk yang
+ * belum sempat disentuh) sudah ikut memakai warna mode gelap.
  */
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { useAppStore } from '../src/store';
-import { C, radius, space } from '../src/ui/theme';
+import { ThemeProvider, useTheme } from '../src/ui/theme-provider';
 
-export default function RootLayout() {
+function Shell() {
   const booted = useAppStore((s) => s.booted);
   const boot = useAppStore((s) => s.boot);
+  const { theme } = useTheme();
+  const { C, radius, space } = theme;
 
   useEffect(() => {
     // boot() cukup sekali untuk seluruh siklus hidup aplikasi.
@@ -23,14 +28,30 @@ export default function RootLayout() {
   }, [boot]);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       {!booted ? (
-        <View style={s.boot}>
-          <View style={s.logoMark}>
-            <Text style={s.logoText}>S</Text>
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: space(4),
+          }}
+        >
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: radius.xl,
+              backgroundColor: C.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: C.primaryForeground, fontSize: 32, fontWeight: '900' }}>S</Text>
           </View>
-          <Text style={s.bootTitle}>Serbabisa POS</Text>
+          <Text style={{ color: C.text, fontSize: 18, fontWeight: '800' }}>Serbabisa POS</Text>
           <ActivityIndicator color={C.primary} />
         </View>
       ) : (
@@ -48,26 +69,16 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
       )}
-    </SafeAreaProvider>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  boot: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.bg,
-    gap: space(4),
-  },
-  logoMark: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.xl,
-    backgroundColor: C.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: { color: '#fff', fontSize: 32, fontWeight: '900' },
-  bootTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
-});
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}

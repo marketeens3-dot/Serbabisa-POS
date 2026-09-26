@@ -5,16 +5,23 @@
  * masih antre offline (ditandai jelas). Kasir harus selalu bisa membuktikan
  * bahwa sebuah penjualan terjadi,even ketika internet mati.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useAppStore } from '../../src/store';
 import { listTransactions, type CachedTransaction } from '../../src/db/repo';
 import { EmptyState, Pill, Row } from '../../src/ui/components';
-import { C, radius, rupiah, space, waktuID } from '../../src/ui/theme';
+import { radius, rupiah, space, waktuID } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 export default function HistoryScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const insets = useSafeAreaInsets();
   const tenantId = useAppStore((s) => s.user?.tenant?.id ?? '');
   const sync = useAppStore((s) => s.sync);
@@ -117,6 +124,11 @@ export default function HistoryScreen() {
 
 /** Rincian nota — membaca dari JSON yang tersimpan saat checkout. */
 function DetailBody({ tx }: { tx: CachedTransaction }) {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   let items: Array<{ name: string; qty: number; price: number }> = [];
   try {
     const parsed = JSON.parse(tx.json) as { items?: typeof items };
@@ -149,7 +161,7 @@ function DetailBody({ tx }: { tx: CachedTransaction }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

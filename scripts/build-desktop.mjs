@@ -69,20 +69,52 @@ function regenerateLocalSchema() {
 // ---------------------------------------------------------------------------
 // 2. Salin direktori (recursive, dengan symlink di-resolve)
 // ---------------------------------------------------------------------------
-function copyDir(from, to) {
+
+/** Tidur sinkron tanpa dependensi. */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Windows: `next dev` yang masih jalan, dan antivirus, sama-sama bisa
+ * memegang handle sesaat → EBUSY/EPERM/EACCES saat menyalin. Ke-3 itu
+ * sementara, jadi dicoba ulang dengan jeda yang menanjang. Error lain
+ * (mis. ENOENT) langsung dilempar, bukan dipaksa retry.
+ */
+function copyFileWithRetry(src, dst, attempts = 5) {
+  for (let i = 1; ; i++) {
+    try {
+      fs.copyFileSync(src, dst);
+      return;
+    } catch (err) {
+      const transient = err && (err.code === "EBUSY" || err.code === "EPERM" || err.code === "EACCES");
+      if (!transient || i >= attempts) throw err;
+      sleepSync(200 * i);
+    }
+  }
+}
+
+/**
+ * @param skip predicate nama entri yang tidak perlu disalin.
+ */
+function copyDir(from, to, skip = () => false) {
   if (!fs.existsSync(from)) return false;
   fs.mkdirSync(to, { recursive: true });
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    if (skip(entry.name)) continue;
     const src = path.join(from, entry.name);
     const dst = path.join(to, entry.name);
-    if (entry.isDirectory()) copyDir(src, dst);
+    if (entry.isDirectory()) copyDir(src, dst, skip);
     else if (entry.isSymbolicLink()) {
       // Windows: symlink tidak selalu didukung tanpa Developer Mode → salin target.
       fs.cpSync(fs.realpathSync(src), dst, { recursive: true, dereference: true });
-    } else fs.copyFileSync(src, dst);
+    } else copyFileWithRetry(src, dst);
   }
   return true;
 }
+
+/** Buang `.env` / `.env.*` — lihat catatan di langkah "Salin server standalone". */
+const isEnvFile = (name) => name === ".env" || name.startsWith(".env.");
 
 // ---------------------------------------------------------------------------
 // 3. Verifikasi file wajib (kalau hilang, .exe akan gagal saat dijalankan)
@@ -192,7 +224,10 @@ function main() {
 
   step("Salin server standalone");
   assertExists(".next/standalone/server.js", "Jalankan `next build` lebih dulu.");
-  copyDir(p(".next", "standalone"), SERVER_OUT);
+  // `.env` sengaja TIDAK ikut tersalin (catatan di bawah): dulu ia disalin
+  // lalu dihapus, dan salinan itulah yang paling sering gagal `EBUSY` di
+  // Windows karena `next dev` yang masih jalan / antivirus memegang handle.
+  copyDir(p(".next", "standalone"), SERVER_OUT, isEnvFile);
   log("✓ .next/standalone → desktop-build/bundle/server");
 
   // static & public tidak di-trace oleh Next, harus disalin manual.
@@ -204,8 +239,9 @@ function main() {
   // Next menyalin .env ke output standalone. Buang: database URL hanya boleh
   // ada di default-config.json (satu sumber kebenaran) dan selalu dikirim lewat
   // environment proses ke server anak — tidak perlu file di dalam paket.
+  // (.env sudah dilewati saat menyalin; loop ini menyapu sisa build sebelumnya.)
   for (const f of fs.readdirSync(SERVER_OUT)) {
-    if (f === ".env" || f.startsWith(".env.")) {
+    if (isEnvFile(f)) {
       fs.rmSync(path.join(SERVER_OUT, f), { force: true });
       log(`− ${f} (buang; koneksi diberikan lewat environment)`);
     }

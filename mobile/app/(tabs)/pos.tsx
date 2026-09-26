@@ -32,12 +32,19 @@ import {
 } from '../../src/db/repo';
 import { checkout, computeTotals, validateCheckout } from '../../src/checkout';
 import { Button, Card, EmptyState, Field, Pill, Banner } from '../../src/ui/components';
-import { C, num, radius, rupiah, space } from '../../src/ui/theme';
+import { num, radius, rupiah, space } from '../../src/ui/theme';
+import type { Theme } from '../../src/ui/theme';
+import { useTheme } from '../../src/ui/theme-provider';
 
 /** Uang receh yang paling sering dipakai kasir. */
 const QUICK_CASH = [5000, 10000, 20000, 50000, 100000];
 
 export default function POSScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, cart, addToCart, setQty, removeFromCart, clearCart, cartTotal, refreshPending } =
@@ -326,7 +333,7 @@ export default function POSScreen() {
             onPress={() => onPay(totals.total)}
             style={[s.quick, s.quickExact]}
           >
-            <Text style={[s.quickText, { color: '#fff' }]}>Uang pas</Text>
+            <Text style={[s.quickText, { color: C.onFill }]}>Uang pas</Text>
           </Pressable>
         </ScrollView>
 
@@ -370,7 +377,7 @@ export default function POSScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',

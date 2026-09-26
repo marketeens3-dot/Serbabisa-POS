@@ -10,7 +10,7 @@
  * Sesi di-cabut server setelah berhasil, jadi kasir harus masuk lagi — itu
  * yang membuat password lama benar-benar tidak berlaku.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppStore } from '../src/store';
 import { api } from '../src/api/client';
 import { Button, Card, Field, Banner } from '../src/ui/components';
-import { C, radius, space } from '../src/ui/theme';
+import { radius, space } from '../src/ui/theme';
+import type { Theme } from '../src/ui/theme';
+import { useTheme } from '../src/ui/theme-provider';
 
 export default function ChangePasswordScreen() {
+  const { theme } = useTheme();
+  const s = useMemo(() => makeStyles(theme), [theme]);
+  const C = theme.C;
+  const radius = theme.radius;
+  const space = theme.space;
   const insets = useSafeAreaInsets();
   const user = useAppStore((s) => s.user);
   const setUser = useAppStore((s) => s.setUser);
@@ -132,7 +139,7 @@ export default function ChangePasswordScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
   scroll: { paddingHorizontal: space(5), gap: space(4) },
   title: { fontSize: 20, fontWeight: '800', color: C.text },
   sub: { fontSize: 13.5, color: C.textMuted, lineHeight: 20 },
