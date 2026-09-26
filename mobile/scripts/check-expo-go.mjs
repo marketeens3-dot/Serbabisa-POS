@@ -50,18 +50,41 @@ const EXPO_GO_SAFE = new Set([
   "react-native-reanimated",
   "react-native-svg",
   "react-native-webview",
+  // Wajib oleh react-native-reanimated 4.x. Karena reanimated 4 sudah bagian
+  // dari Expo SDK 57, worklets ikut terbundel di Expo Go — tanpa ini Expo Go
+  // akan crash begitu saja saat memakai reanimated.
+  "react-native-worklets",
 ]);
+
+/**
+ * Modul build-time: hanya dibaca saat `expo prebuild` / EAS build memproses
+ * app.json. TIDAK pernah masuk bundel runtime, jadi tidak mungkin menyebabkan
+ * "native module not found" — baik di Expo Go maupun di APK/IPA.
+ */
+const BUILD_TIME_ONLY = new Set(["expo-build-properties"]);
+
+/** Modul web-only: dipakai hanya oleh target `expo start --web`. */
+const WEB_ONLY = new Set(["react-dom"]);
 
 /** Pustaka JS-murni: tidak punya native code, aman di Expo Go. */
 const JS_ONLY = new Set(["zustand", "react", "react-native"]);
 
 const deps = Object.keys(pkg.dependencies ?? {});
-const unknown = deps.filter((d) => !EXPO_GO_SAFE.has(d) && !JS_ONLY.has(d));
+const unknown = deps.filter(
+  (d) => !EXPO_GO_SAFE.has(d) && !JS_ONLY.has(d) && !BUILD_TIME_ONLY.has(d) && !WEB_ONLY.has(d),
+);
+
+const label = (d) => {
+  if (EXPO_GO_SAFE.has(d)) return "Expo Go ✓";
+  if (JS_ONLY.has(d)) return "JS-murni ✓";
+  if (BUILD_TIME_ONLY.has(d)) return "build-time ✓";
+  if (WEB_ONLY.has(d)) return "web-only ✓";
+  return "TIDAK DIJAMIN ✗";
+};
 
 console.log(`\nModul terpasang: ${deps.length}`);
 for (const d of deps) {
-  const kind = EXPO_GO_SAFE.has(d) ? "Expo Go ✓" : JS_ONLY.has(d) ? "JS-murni ✓" : "TIDAK DIJAMIN ✗";
-  console.log(`  ${d.padEnd(42)} ${kind}`);
+  console.log(`  ${d.padEnd(42)} ${label(d)}`);
 }
 
 if (unknown.length) {

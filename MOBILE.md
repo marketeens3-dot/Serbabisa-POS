@@ -1,11 +1,38 @@
-# Serbabisa POS - Aplikasi HP (Expo / React Native)
+﻿# Serbabisa POS - Aplikasi HP (Expo / React Native)
 
-Aplikasi kasir untuk Android dan iOS. **Local-first**: kasir tetap bisa
+Aplikasi kasir untuk Android dan iOS/iPadOS. **Local-first**: kasir tetap bisa
 berjualan tanpa internet, dan semua yang tertunda otomatis dikirim ke server
 begitu ada koneksi.
 
 Dokumen ini menjelaskan cara menjalankan, cara kerjanya, batasannya, dan
 bagaimana memverifikasinya.
+
+---
+
+## 0. Baca ini sebelum mulai
+
+**Expo Go tidak bisa dipakai untuk aplikasi kasir offline, dan tidak pernah
+menghasilkan APK/IPA.** Itu bukan pilihan â€” itu fakta teknis:
+
+| | Expo Go | APK / IPA hasil build |
+|---|---|---|
+| Bisa start tanpa internet | **Tidak** | **Ya** |
+| Alasan | Bundel JS diambil dari dev server (Metro) di komputer pengembang setiap kali aplikasi dibuka | Bundel JS tertanam di dalam berkas APK/IPA |
+| Bisa dibagikan ke kasir | Tidak (tidak ada berkas) | **Ya** |
+| Peran yang tepat | development & uji coba cepat | **pemakaian harian** |
+
+Kalau Metro tidak terjangkau, Expo Go **tidak mau start sama sekali** â€” bukan
+"jalan tapi offline". Karena itu aplikasi ini harus dipasang sebagai APK (Android)
+atau IPA (iOS). Seluruh persiapan di repo ini sudah untuk itu; hanya ada satu
+langkah yang tidak bisa dilakukan mesin ini: login akun Expo.
+
+Ringkasnya:
+
+- **Android** â€” bisa dibangun dari Windows lewat EAS cloud build, tanpa Mac.
+  Perintah persis ada di bagian 3.
+- **iOS / iPad** â€” kode dan konfigurasinya sudah siap (`supportsTablet: true`),
+  tetapi build wajib lewat macOS + Xcode, atau EAS macOS runner (paket berbayar).
+  Tidak bisa dari Windows.
 
 ---
 
@@ -44,14 +71,28 @@ barcode bekerja dengan mengetik atau mengirim barcode lalu Enter.
 
 ## 2. Menjalankan
 
+### Untuk dipakai kasir (offline) â€” yang benar
+
 ```bash
 cd mobile
 npm install
-
-npm run android     # Android emulator
-npm run ios         # iOS simulator (harus di macOS)
-npm start           # hanya tampilkan log
+npm run android     # build native + install ke emulator/HP yang tersambung (butuh Android SDK)
 ```
+
+Perintah ini menghasilkan aplikasi sungguhan dengan bundel JS tertanam, jadi ia
+**tetap jalan tanpa Metro dan tanpa internet**. Untuk HP yang tersambung lewat USB,
+build debug terpasang otomatis.
+
+### Untuk development cepat (butuhExpo Go + Metro)
+
+```bash
+npm run start                # hanya log & QR
+npm run android:expo-go      # buka di Expo Go (Android)
+npm run ios:expo-go          # buka di Expo Go (iOS, hanya macOS)
+```
+
+Jalur ini **tidak bisa dipakai offline** (lihat bagian 0) â€”Gunakannya hanya
+untuk iterasi cepat.
 
 Sebelum menjalankan, server harus hidup. Dari folder project utama:
 
@@ -74,6 +115,59 @@ mengizinkan port 3000. Untuk uji coba dari mana saja, `npx expo start
 --tunnel` memberi URL HTTPS tanpa perlu mengatur firewall.
 
 Akun demo: `kasir@demo.local` / `Kasir#2026`
+
+> **`react-dom` dikunci ke `19.2.3`.** Jangan dilepas. `expo` menarik `react-dom`
+> sebagai peer opsional; tanpa pin, npm memilih versi terbaru (19.3.0) yang
+> mensyaratkan `react@^19.3.0`, sementara Expo SDK 57 mengunci `react` di 19.2.3.
+> Akibatnya `npm install` di folder `mobile/` **gagal** dengan ERESOLVE. Pin ini
+> yang membuatnya bisa di-install ulang.
+
+---
+
+## 2b. Membuat APK (Android) â€” langkah yang bisa dilakukan
+
+Tidak butuh Mac. EAS membangunnya di cloud.
+
+```bash
+cd mobile
+npm install
+
+npx eas-cli login          # sekali saja â€” accounts.expo.dev, akun gratis
+npx eas-cli build --platform android --profile preview
+```
+
+Hasilnya: tautan unduh **APK** (profile `preview` memakai `distribution: internal`
++ `buildType: apk`, jadi kasir cukup meng-install berkasnya, tanpa Play Store).
+Build-butuh sekitar 10-20 menit di cloud.
+
+Kalau `eas build` minta `projectId`, itu normal â€” projectserta dibuat saat itu
+juga, dan `projectId` akan masuk ke `app.json`. Setelah itu build berikutnya
+tidak Ask lagi.
+
+### iOS / iPad
+
+```bash
+# hanya di macOS dengan Xcode terpasang
+npx eas-cli build --platform ios --profile preview   # simulator (cek cepat)
+npx eas-cli build --platform ios --profile production # arsip untuk App Store/TestFlight
+```
+
+Dari Windows: tidak bisa. Alternatifnya EAS macOS runner (runner milik mereka,
+paket berbayar) atau menyewa Mac sementara. Yang perlu disiapkan sebelum itu:
+`bundleIdentifier` sudah diisi (`local.serbabisa.pos`) â€” **ganti dengan
+reverse-DNS milik Anda** (`com.tokoanda.pos`) sebelum rilis, karena Apple
+menolak identifier generik.
+
+### distributing ke kasir
+
+1. Unduh APK-nya, salin ke HP kasir.
+2. Settings â†’ Apps â†’ Special app access â†’ **Install unknown apps** â†’ izinkan
+   aplikasi Files/Chrome yang dipakai untuk membuka APK.
+3. Buka APK â†’ Install.
+4. Di aplikasi: masuk â†’ atur alamat server (Vercel atau IP on-premise).
+
+Peringatan SmartScreen/Play Protect akan muncul karena APK belum ditandatangani.
+Untuk produksi, tambahkan keystore dan `credentialsSource` di `eas.json`.
 
 ---
 
@@ -220,33 +314,51 @@ jaringan seluler yang mahal dan lambat, dan kasir sedang menunggu.
 ```bash
 cd mobile
 
-# Semua modul native dipastikan tersedia di Expo Go
+# 1. Kesehatan config & dependensi Expo (21 pemeriksaan)
+npx expo-doctor
+
+# 2. Semua modul native dipastikan tersedia di Expo Go
 node scripts/check-expo-go.mjs
 
-# Tidak ada error TypeScript
+# 3. Tidak ada error TypeScript
 npm run typecheck
+
+# 4. Bundel benar-benar bisa dibangun untuk KEDUA platform
+npx expo export --platform android --platform ios --output-dir dist-verify
 ```
 
-Bukti bahwa seluruh graph aplikasi benar-benar bisa di-bundle:
+Nomor 4 adalah pembuktian yang paling jujur: ia menangkap import yang hilang,
+modul native di luar Expo Go, dan kesalahan bundling apa pun. Hal itu tidak
+akan terlihat dari `tsc` saja. Hasil terakhir di mesin ini:
+
+```
+iOS Bundled      1156 modules  -> 2.6 MB
+Android Bundled  1291 modules  -> 2.9 MB
+expo-doctor      21/21 checks passed
+```
+
+Bisa juga memakai skrip dari folder project utama:
 
 ```bash
-npx expo start --port 8099
-# di terminal lain:
-curl -o bundle.js "http://localhost:8099/node_modules/expo-router/entry.bundle?platform=android&dev=true&minify=false"
+npm run mobile:doctor     # expo-doctor
+npm run mobile:check      # allowlist Expo Go
+npm run mobile:typecheck  # TypeScript
+npm run mobile:export     # bundle android + ios
 ```
-
-Bundling adalah pembuktian yang paling jujur: ia menangkap import yang hilang,
-modul native di luar Expo Go, dan kesalahan bundling apa pun. Hal itu tidak
-akan terlihat dari `tsc` saja.
 
 Di sisi server, dari folder project utama:
 
 ```bash
-npm run review          # 61 pemeriksaan: uang, stok, tenant, keamanan, concurrency
+npm run review          # 66 pemeriksaan: uang, stok, tenant, keamanan, concurrency
 npm run test:offline    # 14 pemeriksaan mode offline
 npm run test:sync       # 21 pemeriksaan sinkronisasi dua perangkat
 npm run test:sqlite     # konkurensi SQLite
 ```
+
+> Yang **belum** terverifikasi: aplikasi belum pernah dijalankan di perangkat
+> nyata maupun emulator, karena tidak ada perangkat di lingkungan build ini.
+> Semua bukti di atas bersifat build-time. Satu-satunya pembuktian penuh adalah
+> menjalankan APK di HP kasir.
 
 ---
 
