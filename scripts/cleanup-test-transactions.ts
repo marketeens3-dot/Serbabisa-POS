@@ -6,8 +6,9 @@
  * (4 nota pertama) tidak disentuh.
  *
  * Usage:
- *   bun scripts/cleanup-test-transactions.ts           # dry-run
- *   bun scripts/cleanup-test-transactions.ts --yes
+ *   npm run db:clean-test          # sudah termasuk --yes
+ *   node scripts/cleanup-test-transactions.ts           # dry-run
+ *   node scripts/cleanup-test-transactions.ts --yes
  */
 import { PrismaClient } from "@prisma/client";
 
