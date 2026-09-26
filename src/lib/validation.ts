@@ -163,6 +163,17 @@ export const checkoutSchema = z.object({
     .max(1_000_000_000_000, 'Jumlah bayar terlalu besar'),
   notes: z.string().trim().max(500, 'Catatan terlalu panjang').nullish(),
   idempotencyKey: z.union([z.string().min(8).max(64), z.null()]).optional(),
+  /**
+   * Total yang benar-benar dibayar pelanggan di toko, diisi HANYA oleh klien
+   * native yang mencatat transaksi saat offline lalu mengirimkannya nanti.
+   *
+   * Gunanya: server tetap menghitung totalnya sendiri dari harga terkini (anti
+   * price tampering), tapi kalau hasilnya berbeda dari yang terjadi di toko,
+   * transaksi harus DITOLAK dengan pesan yang bisa ditindaklanjuti kasir —
+   * bukan diam-diam disimpan dengan angka lain, dan bukan juga sekadar
+   * "pembayaran kurang" yang tidak menjelaskan apa pun.
+   */
+  clientTotal: moneyField.optional(),
 })
 
 export const voidSchema = z.object({

@@ -17,6 +17,23 @@ const csp = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Prisma Client untuk runtime lokal (SQLite) dikecualikan dari bundling.
+  //
+  // PENTING: kalau client ini ikut di-inline oleh webpack, Prisma akan
+  // meng-hardcode path absolut mesin build ke dalam bundle. Aplikasi .exe
+  // lalu gagal start di komputer mana pun selain mesin build. Dengan
+  // diecualikan, webpack hanya menulis require() dan output tracing
+  // menyalin folder client + engine-nya ke dalam paket standalone.
+  serverExternalPackages: ["@serbabisa/prisma-local"],
+  // Buang paket yang tidak pernah dipakai saat runtime.
+  //
+  // Tanpa ini, output tracing ikut menyalin `typescript` (sekitar 19 MB) ke
+  // dalam paket standalone karena Next memakainya saat typecheck build.
+  // TypeScript hanya dibutuhkan saat build, bukan saat aplikasi berjalan,
+  // jadi ikutnya di installer itu bobot yang tidak perlu diunduh kasir.
+  outputFileTracingExcludes: {
+    "*": ["node_modules/typescript/**", "node_modules/@types/**"],
+  },
   // Sembunyikan indikator dev floating (pojok kiri bawah) agar preview di
   // ponsel/tablet bersih — overlay tersebut bukan bagian dari aplikasi.
   devIndicators: false,

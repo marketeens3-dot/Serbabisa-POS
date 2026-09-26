@@ -46,6 +46,13 @@ export function handleApiError(err: unknown): NextResponse {
   if (prismaErr?.code === 'P2025') {
     return fail('NOT_FOUND', 'Data tidak ditemukan.', 404)
   }
+  // Body JSON tidak valid. `req.json()` melempar SyntaxError, dan tanpa
+  // penanganan khusus ia jatuh ke 500 — padahal ini kesalahan klien, bukan
+  // kegagalan server. Akibatnya 500 ikut naik di monitoring dan galat server
+  // yang sebenarnya jadi sulit dibedakan dari request yang simply rusak.
+  if (err instanceof SyntaxError) {
+    return fail('INVALID_JSON', 'Format data yang dikirim tidak valid.', 400)
+  }
   // Log teknis aman di server (tanpa secret).
   console.error('[api-error]', err instanceof Error ? err.message : err)
   return fail('INTERNAL_ERROR', 'Terjadi kesalahan. Silakan coba lagi.', 500)

@@ -40,6 +40,10 @@
     "node_modules",
     "examples",
     "skills",
-    "download"
+    "download",
+    "desktop-build",
+    "release",
+    "generated",
+    "mobile"
   ]
 }

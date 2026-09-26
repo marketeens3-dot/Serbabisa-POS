@@ -4,6 +4,11 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" = engine untuk mesin build ini (Windows saat ini).
+  // "windows" eksplisit agar client bisa dipakai juga di runtime lain
+  // (mis. build di Linux, jalan di Windows) — engine Prisma berbasis N-API
+  // sehingga tetap kompatibel dengan Node maupun Electron (ABI berbeda).
+  binaryTargets = ["native", "windows"]
 }
 
 datasource db {
@@ -78,6 +83,7 @@ model Tenant {
   invoiceTemplates InvoiceTemplate[]
   invoiceCounters  InvoiceCounter[]
   auditLogs        AuditLog[]
+  devices          Device[]
 
   @@index([isActive])
 }
@@ -301,4 +307,69 @@ model SystemSetting {
   key       String   @id
   value     String // JSON string
   updatedAt DateTime @updatedAt
+}
+
+// ============================================================================
+// OFFLINE / SYNC
+//
+// Aplikasi desktop berjalan LOCAL-FIRST: seluruh baca/tulis terjadi pada SQLite
+// lokal (prisma/schema.sqlite.prisma — hasil generate dari file ini). Supabase
+// adalah salinan bersama antar perangkat + tempat identitas (user, tenant).
+//
+// Tiga model di bawah inilah yang memungkinkan sinkronisasi multi-perangkat.
+// ============================================================================
+
+// Registry perangkat kasir. Dibuat di cloud saat perangkat pertama kali sync;
+// dipakai untuk reservasi blok nomor nota.
+model Device {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  platform   String   @default("WINDOWS")
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  invoiceBlocks    InvoiceBlock[]
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// Reservasi blok nomor nota per perangkat.
+//
+// MASALAH: dua perangkat offline bisa sama-sama menerbitkan INV-2026-000005.
+// SOLUSI: perangkat memesan blok nomor (mis. 1..50) dari cloud saat online,
+// lalu memakai sendiri saat offline. Cloud menaikkan InvoiceCounter secara
+// atomik per pemesanan → nomor tetap UNIK dan FORMAT tidak berubah
+// (INV-YYYY-NNNNNN), jadi nota yang sudah tercetak tetap sah.
+model InvoiceBlock {
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  year      Int
+  startSeq  Int
+  endSeq    Int // inklusif
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, deviceId, startSeq])
+  @@index([tenantId, year])
+  @@index([deviceId])
+}
+
+// Buku besar status sinkron per perangkat.
+//
+// Dipakai di sisi perangkat: menandai entitas yang berubah lokal sejak push
+// terakhir (dirty) dan yang sudah soft-deleted (deletedAt) supaya penghapusan
+// ikut merambat ke cloud. Di sisi cloud tabel ini tidak pernah ditulis.
+model SyncState {
+  entity     String
+  entityId   String
+  dirty      Boolean  @default(false)
+  deletedAt  DateTime?
+  syncedAt   DateTime?
+  syncedHash String? // hash isi saat push/pull terakhir (deteksi tabrakan LWW)
+
+  @@id([entity, entityId])
+  @@index([entity, dirty])
 }

@@ -7,7 +7,7 @@
  */
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
-import { hashPassword } from '../src/lib/auth'
+import { hashPassword } from '../src/lib/password'
 import { createTenantWithTemplates, parseInvoiceSettings } from '../src/lib/services/tenant'
 import { BUILTIN_TEMPLATE_PRESETS } from '../src/lib/invoice'
 

@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SyncIndicator from "./sync-indicator";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -326,6 +327,7 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
                   <span className="text-sm truncate">{user.tenant.businessName}</span>
                 </div>
               )}
+              <SyncIndicator />
               <ThemeToggle />
               <UserMenu user={user} onProfile={() => navigate("/app/profile")} onLogout={logout} isAdmin={user.role === "SUPER_ADMIN"} />
             </header>

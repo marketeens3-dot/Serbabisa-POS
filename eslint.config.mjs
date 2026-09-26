@@ -44,7 +44,28 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  // Main process Electron & tooling build harus CommonJS (require/module.exports)
+  // agar bisa dipaket ke dalam app.asar tanpa transformasi.
+  files: ["electron/**/*.cjs", "scripts/**/*.cjs"],
+  rules: {
+    "@typescript-eslint/no-require-imports": "off",
+    "@typescript-eslint/no-var-requires": "off",
+  },
+}, {
+  ignores: [
+    "node_modules/**",
+    ".next/**",
+    "out/**",
+    "build/**",
+    // Artefak paket desktop (hasil salinan standalone Next.js + electron-builder)
+    "desktop-build/**",
+    "release/**",
+    // Prisma Client hasil generate untuk runtime lokal (SQLite)
+    "generated/**",
+    "next-env.d.ts",
+    "examples/**",
+    "skills",
+  ],
 }];
 
 export default eslintConfig;

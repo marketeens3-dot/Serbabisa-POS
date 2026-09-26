@@ -1,14 +1,19 @@
 // Autentikasi server-side: scrypt password hashing + session token (hash sha256 di DB, token di cookie httpOnly).
 // Password TIDAK PERNAH disimpan plaintext / dilog.
 
-import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto'
+import { randomBytes, randomUUID } from 'crypto'
 import { cookies } from 'next/headers'
 import type { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { sha256 } from '@/lib/password'
+
+// Fungsi kriptografi hidup di modul sendiri supaya skrip non-Next (seed,
+// bootstrap admin) bisa memakainya tanpa menarik runtime Next.js.
+// Di-rekspor di sini supaya seluruh pemanggil lama tidak perlu diubah.
+export { hashPassword, verifyPassword, generateTemporaryPassword } from '@/lib/password'
 
 export const SESSION_COOKIE = 'sb_session'
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 hari
-const SCRYPT_KEYLEN = 64
 const MAX_FAILED_ATTEMPTS = 8
 const LOCK_MS = 15 * 60 * 1000
 
@@ -34,38 +39,11 @@ export type SessionUser = {
   tenant: SessionTenant | null
 }
 
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex')
-  const hash = scryptSync(password, salt, SCRYPT_KEYLEN).toString('hex')
-  return `scrypt:${salt}:${hash}`
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, salt, hash] = stored.split(':')
-  if (scheme !== 'scrypt' || !salt || !hash) return false
-  const candidate = scryptSync(password, salt, SCRYPT_KEYLEN)
-  const expected = Buffer.from(hash, 'hex')
-  return candidate.length === expected.length && timingSafeEqual(candidate, expected)
-}
-
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex')
-}
-
 /** Hash token sesi aktif saat ini (untuk revoke sesi lain saat ganti password). */
 export async function currentSessionTokenHash(): Promise<string | null> {
   const store = await cookies()
   const token = store.get(SESSION_COOKIE)?.value
   return token ? sha256(token) : null
-}
-
-export function generateTemporaryPassword(): string {
-  // Ramah kasir: huruf besar + angka, tanpa karakter ambigu.
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-  const bytes = randomBytes(12)
-  let out = ''
-  for (let i = 0; i < 12; i++) out += alphabet[bytes[i] % alphabet.length]
-  return out + '9' // memastikan memenuhi kebijakan (ada angka)
 }
 
 export async function createSession(
@@ -126,7 +104,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   })
   if (!session) return null
   if (session.expiresAt < new Date()) {
-    await db.session.delete({ where: { id: session.id } }).catch(() => undefined)
+    // `deleteMany` supaya race di mana dua request menghapus sesi yang sama
+    // tidak tercatat sebagai `prisma:error`. Sesi kedaluwarsa yang dihapus
+    // bersih adalah kondisi normal, bukan kegagalan.
+    await db.session.deleteMany({ where: { id: session.id } })
     return null
   }
   const user = session.user

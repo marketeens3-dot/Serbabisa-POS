@@ -103,6 +103,26 @@ export async function POST(req: NextRequest) {
         },
         include: { category: { select: { name: true } } },
       })
+
+      // Stok awal dicatat di LEDGER (InventoryMovement), bukan hanya diisi di
+      // kolom stockQty.
+      //
+      // Ini wajib: sejak aplikasi menjadi local-first, stok dihitung ulang dari
+      // ledger supaya semua perangkat berakhir pada angka yang sama. Kalau stok
+      // awal tidak masuk ledger, item ini akan dihitung ulang menjadi
+      // (penjualan) negatif begitu pertama kali sinkronisasi berjalan.
+      if (body.type === 'PRODUCT' && body.stockQty > 0) {
+        await tx.inventoryMovement.create({
+          data: {
+            tenantId,
+            catalogItemId: created.id,
+            movementType: 'ADJUSTMENT',
+            quantity: body.stockQty,
+            note: 'Stok awal saat item dibuat',
+          },
+        })
+      }
+
       await logAudit(tx, {
         actorUserId: user.id,
         tenantId,

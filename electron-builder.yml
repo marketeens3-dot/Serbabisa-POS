@@ -1,0 +1,84 @@
+# Konfigurasi electron-builder untuk Serbabisa POS Desktop.
+# Dipakai oleh: npm run desktop:pack (uji, --dir) dan npm run desktop:dist (installer + portable)
+#
+# Struktur paket:
+#   resources/app.asar        → electron/main.cjs + electron/preload.cjs (shell)
+#   resources/server/         → Next.js standalone (server.js + .next + node_modules)
+#   resources/default-config.json → DATABASE_URL bawaan (bisa diganti user)
+
+appId: local.serbabisa.pos
+productName: Serbabisa POS
+copyright: Copyright © 2026 Serbabisa
+
+directories:
+  output: release
+  buildResources: build
+
+# Hanya shell Electron yang di-paket; server ada di extraResources (di luar asar
+# karena Prisma & sharp memuat file .dll.node lewat dlopen).
+files:
+  - electron/main.cjs
+  - electron/preload.cjs
+  - electron/ipc.cjs
+  - electron/config.cjs
+  - electron/connection.html
+  - electron/connection-preload.cjs
+  - package.json
+
+asar: true
+
+extraResources:
+  # `from` menunjuk ke `bundle/` (bukan ke server/ langsung) dengan sengaja:
+  # filter electron-builder membuang folder `node_modules` yang berada di root
+  # folder sumber. Dengan satu level ini, path-nya `server/node_modules/...`
+  # sehingga seluruh dependensi server ikut tersalin.
+  - from: desktop-build/bundle
+    to: .
+    filter:
+      - "**/*"
+
+# Electron runtime & bahasa: app ini Bahasa Indonesia.
+electronLanguages:
+  - id
+  - en-US
+
+compression: normal
+removePackageScripts: true
+buildDependenciesFromSource: false
+
+# Lewati install/rebuild + pengumpulan node_modules (lihat electron/builder-hooks.cjs).
+beforeBuild: ./electron/builder-hooks.cjs
+
+win:
+  # nsis = installer dengan wizard; portable = satu file .exe tanpa install.
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: Serbabisa-POS-${version}-${arch}.${ext}
+  # Per Notices Kasir tidak butuh admin; signature dikosongkan (self-signed
+  # butuh certificate, lihat DESKTOP.md).
+  signAndEditExecutable: true
+  legalTrademarks: Serbabisa
+
+nsis:
+  artifactName: Serbabisa-POS-${version}-Setup.${ext}
+  # oneClick: false → wizard install (pilih folder, shortcut, uninstall).
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Serbabisa POS
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  # Tanpa pemilih bahasa: installer mengikuti bahasa sistem. electron-builder
+  # belum menyertakan terjemahan NSIS Bahasa Indonesia, jadi komputer kasir
+  # ber-locale id_ID akan melihat teks English.
+  displayLanguageSelector: false
+
+portable:
+  artifactName: Serbabisa-POS-${version}-Portable.${ext}

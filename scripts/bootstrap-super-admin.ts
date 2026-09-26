@@ -7,7 +7,7 @@
  * Menjalankan: bun run scripts/bootstrap-super-admin.ts
  */
 import { PrismaClient } from '@prisma/client'
-import { hashPassword, generateTemporaryPassword } from '../src/lib/auth'
+import { hashPassword, generateTemporaryPassword } from '../src/lib/password'
 
 const db = new PrismaClient()
 

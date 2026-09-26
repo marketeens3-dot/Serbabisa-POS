@@ -23,6 +23,15 @@ next-env.d.ts
 /build
 server.log
 
+# --- Desktop (Electron) ---
+# desktop-build/ memuat default-config.json berisi DATABASE_URL → JANGAN commit
+desktop-build/
+/release/
+
+# Prisma Client untuk runtime lokal (SQLite) — hasil generate, di dalam node_modules
+# tapi tetap dicoret supaya `git add -A` tidak pernah mengambilnya.
+/generated/
+
 # --- Environment & SEKRET (JANGAN commit!) ---
 .env
 .env.*
@@ -30,9 +39,20 @@ server.log
 *.pem
 
 # --- Database lokal (SQLite dev/backup) — produksi memakai Supabase ---
-db/
+# PENTING: pakai `/db/` (root-only), bukan `db/`.
+#
+# `db/` tanpa garis depan cocok ke direktori bernama `db` di level MANA pun.
+# Akibatnya `mobile/src/db/` — yang berisi skema SQLite, antrean outbox, dan
+# perhitungan stok efektif aplikasi HP — ikut tercoret dan TIDAK PERNAH
+# masuk commit. File itu hilang tanpa error apa pun: `git add -A` tetap
+# sukses, hanya diam-diam tidak membawa kode yang paling penting itu.
+#
+# Pola `*.db` di bawah tetap aman karena ekstensi database sudah unik.
+/db/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 
 # --- Log & debug ---
 npm-debug.log*
@@ -49,6 +69,13 @@ coverage
 # --- Vercel ---
 .vercel
 
+# --- Graphify (knowledge graph lokal — hasil generate, ±4,5MB) ---
+# graphify-out/ berisi graph.json, graph.html, GRAPH_REPORT.md, dan cache SHA256.
+# Semua bisa dibuat ulang dengan `graphify extract . --code-only`, jadi tidak
+# pernah masuk repo. Throttling: `git add -A` akan mengambilnya kalau tidak dicoret.
+graphify-out/
+.graphify/
+
 # --- Download arsip workspace (berisi .env & db — JANGAN commit!) ---
 public/serbabisa-workspace-*.zip
 
@@ -62,9 +89,15 @@ mini-services/
 .zscripts/
 tests/
 icons-backup/
-docs/
 worklog.md
 Caddyfile
 .claude
 .z-ai-config
 prompt
+
+# CATATAN: `docs/` SENGAJA TIDAK dicoret. Isinya dokumentasi keamanan (ISO/IEC
+# 27001:2022) dan pemetaan kualitas (ISO/IEC 25010) yang merupakan bagian dari
+# deliverable, bukan artefak sandbox. Semula docs/ ikut tercoret karena berada
+# di daftar yang sama dengan folder hasil unduhan — Akibatnya repository
+# GitHub tidak memuat satu pun dokumen keamanan, padahal klaim keamanan
+# aplikasi merujuk ke file-file tersebut.

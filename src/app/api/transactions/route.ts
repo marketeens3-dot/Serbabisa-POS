@@ -14,7 +14,8 @@ import { checkoutSchema } from '@/lib/validation'
 import { ApiError, assertSameOrigin, getClientIp, getUserAgent, handleApiError, parsePagination, requireUser } from '@/lib/api'
 import { logAudit } from '@/lib/audit'
 import { AUDIT_ACTIONS } from '@/lib/constants'
-import { jakartaYear } from '@/lib/format'
+import { formatIDR, jakartaYear } from '@/lib/format'
+import { allocateInvoiceNumber, ensureInvoiceBlockReady } from '@/lib/invoice-number'
 import { parseInvoiceSettings } from '@/lib/services/tenant'
 import { toTransactionDTO } from '@/lib/services/serializers'
 
@@ -124,7 +125,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const result = await db.$transaction(async (tx) => {
+    // ---------- SIAPKAN BLOK NOMOR NOTA (BEFORE TRANSACTION) ----------
+    // Pemesanan blok ke cloud menyentuh jaringan, jadi WAJIB di luar
+    // db.$transaction — kalau di dalam, transaksi SQLite menunggu sampai
+    // timeout dan checkout gagal.
+    const year = jakartaYear()
+    await ensureInvoiceBlockReady(tenantId, year)
+
+    const result = await db.$transaction(
+      async (tx) => {
       // ---------- VALIDASI ITEM (milik tenant + aktif) ----------
       const ids = [...new Set(body.items.map((i) => i.catalogItemId))]
       const catalogItems = await tx.catalogItem.findMany({
@@ -189,6 +198,26 @@ export async function POST(req: NextRequest) {
       }
       const taxAmount = body.taxAmount
       const totalAmount = subtotal - discountAmount + taxAmount
+
+      // ---------- VERIFIKASI TRANSAKSI YANG DIANTRE OFFLINE ----------
+      // Klien native mengirim `clientTotal`: jumlah yang benar-benar diterima
+      // dari pelanggan saat perangkat sedang offline. Harga di server bisa saja
+      // sudah berubah selama perangkat tidak terhubung.
+      //
+      // Kalau berbeda, transaksi ini TIDAK boleh diam-diam disimpan dengan
+      // angka lain — uang yang diterima kasir tidak akan cocok dengan catatan.
+      // Menolak dengan kode khusus supaya aplikasi HP bisa menampilkannya
+      // sebagai hal yang butuh tindakan manusia, bukan error technical.
+      if (body.clientTotal !== undefined && body.clientTotal !== totalAmount) {
+        throw new ApiError(
+          'PRICE_CHANGED',
+          `Harga berubah setelah transaksi ini dicatat: pelanggan membayar ${formatIDR(body.clientTotal)}, ` +
+            `tapi harga sekarang menjadi ${formatIDR(totalAmount)}. ` +
+            `Transaksi perlu dicatat manual oleh pemilik toko.`,
+          409
+        )
+      }
+
       if (body.paidAmount < totalAmount) {
         throw new ApiError('INVALID_PAYMENT', 'Jumlah bayar kurang dari total belanja.', 400)
       }
@@ -210,14 +239,11 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       })
 
-      // ---------- NOMOR INVOICE ATOMIC ----------
+      // ---------- NOMOR INVOICE ----------
+      // Mode lokal: alokasi blok per perangkat (aman offline & multi-kasir).
+      // Mode cloud: counter global atomik.
       const year = jakartaYear()
-      const counter = await tx.invoiceCounter.upsert({
-        where: { tenantId_year: { tenantId, year } },
-        create: { tenantId, year, lastNumber: 1 },
-        update: { lastNumber: { increment: 1 } },
-      })
-      const invoiceNumber = `INV-${year}-${String(counter.lastNumber).padStart(6, '0')}`
+      const invoiceNumber = await allocateInvoiceNumber(tx, { tenantId, year })
 
       // ---------- INSERT ----------
       const transaction = await tx.transaction.create({
@@ -274,7 +300,12 @@ export async function POST(req: NextRequest) {
           customer: { select: { name: true, phone: true } },
         },
       })
-    })
+      },
+      // Timeout 15 detik: default Prisma 5 detik terlalu rapat untuk SQLite,
+      // yang menyerialisasi semua penulisan. Checkout di bawahnya tetap satu
+      // transaksi atomik — nilai ini hanya batas waktu, bukan batas atomicity.
+      { timeout: 15_000, maxWait: 10_000 },
+    )
 
     return NextResponse.json({ transaction: toTransactionDTO(result!), idempotentReplay: false }, { status: 201 })
   } catch (err) {
