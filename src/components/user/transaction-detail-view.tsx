@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Ban, MessageCircle, Printer, RotateCcw, Store } from "lucide-react";
+import { ArrowLeft, Ban, Download, MessageCircle, Printer, RotateCcw, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +20,7 @@ import {
   TransactionStatusBadge,
 } from "@/components/app/shared";
 import { InvoiceRenderer, type InvoiceStore } from "@/components/invoice/invoice-renderer";
+import { InvoiceJpgCapture, useInvoiceJpg } from "@/components/invoice/download-invoice";
 import { RefundDialog } from "@/components/user/refund-dialog";
 import { PrintableInvoice, usePrintInvoice } from "@/components/invoice/print-invoice";
 import { DEFAULT_INVOICE_CONFIG, type InvoiceTemplateConfig } from "@/lib/invoice";
@@ -48,6 +49,14 @@ export default function TransactionDetailView({ transactionId }: { transactionId
     return def?.config ?? DEFAULT_INVOICE_CONFIG
   })()
   const printInvoice = usePrintInvoice(config.paperSize)
+  // Dipanggil sebelum early-return (aturan hooks) — tx boleh null saat memuat.
+  const jpg = useInvoiceJpg({ transaction: tx, config, store: {
+    businessName: user.tenant?.businessName ?? "",
+    address: user.tenant?.address ?? null,
+    phone: user.tenant?.phone ?? null,
+    whatsappNumber: user.tenant?.whatsappNumber ?? null,
+    logoUrl: user.tenant?.logoUrl ?? null,
+  } })
 
   useEffect(() => {
     if (voidOpen) {
@@ -127,6 +136,10 @@ export default function TransactionDetailView({ transactionId }: { transactionId
                     <Button variant="outline" onClick={printInvoice}>
                       <Printer className="size-4" />
                       Cetak Nota
+                    </Button>
+                    <Button variant="outline" onClick={() => void jpg.downloadJpg()} disabled={jpg.downloading}>
+                      <Download className="size-4" />
+                      {jpg.downloading ? "Menyiapkan…" : "Unduh JPG"}
                     </Button>
                     <Button variant="outline" onClick={handleWhatsApp}>
                       <MessageCircle className="size-4" />
@@ -351,6 +364,12 @@ export default function TransactionDetailView({ transactionId }: { transactionId
           </div>
 
           <PrintableInvoice transaction={tx} config={config} store={store} />
+          <InvoiceJpgCapture
+            captureRef={jpg.captureRef}
+            transaction={tx}
+            config={config}
+            store={store}
+          />
         </>
       )}
 

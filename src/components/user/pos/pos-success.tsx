@@ -3,9 +3,10 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, MessageCircle, Printer, RotateCcw } from "lucide-react";
+import { CheckCircle2, Download, MessageCircle, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InvoiceRenderer, type InvoiceStore } from "@/components/invoice/invoice-renderer";
+import { InvoiceJpgCapture, useInvoiceJpg } from "@/components/invoice/download-invoice";
 import { PrintableInvoice, usePrintInvoice } from "@/components/invoice/print-invoice";
 import { DEFAULT_INVOICE_CONFIG, type InvoiceTemplateConfig } from "@/lib/invoice";
 import { api, ApiClientError } from "@/lib/api-client";
@@ -42,6 +43,8 @@ export function PosSuccess({
     whatsappNumber: store.whatsappNumber,
     logoUrl: store.logoUrl,
   }
+
+  const jpg = useInvoiceJpg({ transaction, config: effectiveConfig, store: invoiceStore })
 
   async function handleWhatsApp() {
     setSendingWa(true)
@@ -105,6 +108,16 @@ export function PosSuccess({
               size="lg"
               variant="outline"
               className="h-11 active:scale-[0.98]"
+              onClick={() => void jpg.downloadJpg()}
+              disabled={jpg.downloading}
+            >
+              <Download className="size-4.5" />
+              {jpg.downloading ? "Menyiapkan…" : "Unduh Nota (JPG)"}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-11 active:scale-[0.98]"
               onClick={handleWhatsApp}
               disabled={sendingWa}
             >
@@ -133,6 +146,12 @@ export function PosSuccess({
       </div>
 
       <PrintableInvoice transaction={transaction} config={effectiveConfig} store={invoiceStore} />
+      <InvoiceJpgCapture
+        captureRef={jpg.captureRef}
+        transaction={transaction}
+        config={effectiveConfig}
+        store={invoiceStore}
+      />
     </div>
   )
 }
