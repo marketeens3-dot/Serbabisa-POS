@@ -28,6 +28,7 @@ const SAMPLE_TX: TransactionDTO = {
   invoiceNumber: "INV-2026-000123",
   subtotal: 85000,
   discountAmount: 5000,
+  discountPercent: 0,
   taxAmount: 0,
   totalAmount: 80000,
   paidAmount: 100000,

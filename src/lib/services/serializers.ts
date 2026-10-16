@@ -156,6 +156,7 @@ type TxRow = {
   invoiceNumber: string
   subtotal: number
   discountAmount: number
+  discountPercent: number
   taxAmount: number
   totalAmount: number
   paidAmount: number
@@ -182,6 +183,7 @@ export function toTransactionDTO(row: TxRow): TransactionDTO {
     invoiceNumber: row.invoiceNumber,
     subtotal: row.subtotal,
     discountAmount: row.discountAmount,
+    discountPercent: row.discountPercent ?? 0,
     taxAmount: row.taxAmount,
     totalAmount: row.totalAmount,
     paidAmount: row.paidAmount,

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatPercentID } from "@/lib/format";
 import type { CartLine } from "@/components/user/pos/pos-view";
 
 const METHODS = [
@@ -28,6 +28,7 @@ export function CheckoutDialog({
   cart,
   subtotal,
   discount,
+  discountPercent = 0,
   submitting,
   onSubmit,
 }: {
@@ -36,6 +37,8 @@ export function CheckoutDialog({
   cart: CartLine[]
   subtotal: number
   discount: number
+  /** Persen diskon yang aktif (>0 = mode diskon persen seluruh item). */
+  discountPercent?: number
   submitting: boolean
   onSubmit: (payload: { paymentMethod: string; paidAmount: number; taxAmount: number; notes: string | null }) => Promise<void>
 }) {
@@ -92,7 +95,8 @@ export function CheckoutDialog({
           </DialogTitle>
           <DialogDescription>
             {cart.length} item · Subtotal {formatIDR(subtotal)}
-            {discount > 0 && ` · Diskon ${formatIDR(discount)}`}
+            {discount > 0 &&
+              ` · Diskon${discountPercent > 0 ? ` ${formatPercentID(discountPercent)}` : ""} ${formatIDR(discount)}`}
           </DialogDescription>
         </DialogHeader>
 

@@ -151,7 +151,7 @@ export const ENTITIES: readonly EntityDef[] = [
     tenantScoped: true,
     fields: [
       'id', 'tenantId', 'customerId', 'cashierId', 'cashSessionId', 'invoiceNumber',
-      'subtotal', 'discountAmount', 'taxAmount', 'totalAmount', 'paidAmount', 'changeAmount',
+      'subtotal', 'discountAmount', 'discountPercent', 'taxAmount', 'totalAmount', 'paidAmount', 'changeAmount',
       'paymentMethod', 'status', 'notes', 'voidReason', 'voidedAt', 'voidedById',
       'refundedAmount', 'refundReason', 'refundedAt', 'refundedById', 'createdAt', 'updatedAt',
     ],

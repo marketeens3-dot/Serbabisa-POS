@@ -4,7 +4,7 @@
 
 import type { InvoiceTemplateConfig } from "@/lib/invoice";
 import type { TransactionDTO } from "@/lib/types";
-import { formatDateID, formatTimeID, formatIDR, formatQty } from "@/lib/format";
+import { formatDateID, formatTimeID, formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
@@ -116,7 +116,12 @@ export function InvoiceRenderer({
         {/* Totals */}
         <div className="space-y-0.5 tabular">
           <Row label="Subtotal" value={formatIDR(transaction.subtotal)} />
-          {transaction.discountAmount > 0 && <Row label="Diskon" value={`- ${formatIDR(transaction.discountAmount)}`} />}
+          {transaction.discountAmount > 0 && (
+            <Row
+              label={`Diskon${transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""}`}
+              value={`- ${formatIDR(transaction.discountAmount)}`}
+            />
+          )}
           {config.showTax && transaction.taxAmount > 0 && <Row label="Pajak" value={formatIDR(transaction.taxAmount)} />}
           <div className="border-t pt-1 mt-1" style={{ borderColor: accent }} />
           <Row label="TOTAL" value={formatIDR(transaction.totalAmount)} bold />
@@ -208,7 +213,12 @@ export function InvoiceRenderer({
       <div className="flex justify-end mt-4">
         <div className="w-64 space-y-1 tabular">
           <Row label="Subtotal" value={formatIDR(transaction.subtotal)} />
-          {transaction.discountAmount > 0 && <Row label="Diskon" value={`- ${formatIDR(transaction.discountAmount)}`} />}
+          {transaction.discountAmount > 0 && (
+            <Row
+              label={`Diskon${transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""}`}
+              value={`- ${formatIDR(transaction.discountAmount)}`}
+            />
+          )}
           {config.showTax && transaction.taxAmount > 0 && <Row label="Pajak" value={formatIDR(transaction.taxAmount)} />}
           <div className="pt-1.5 mt-1.5" style={{ borderTop: `2px solid ${accent}` }} />
           <Row label="TOTAL" value={formatIDR(transaction.totalAmount)} bold />

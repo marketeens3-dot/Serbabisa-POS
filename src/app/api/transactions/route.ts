@@ -192,7 +192,14 @@ export async function POST(req: NextRequest) {
 
       // ---------- HITUNG ULANG SERVER-SIDE ----------
       const subtotal = lines.reduce((s, l) => s + l.subtotal, 0)
-      const discountAmount = body.discountAmount
+      // Diskon persen > 0 → diskon diterapkan ke SELURUH item; nominal SELALU
+      // dihitung ulang dari harga database (anti price tampering, sama seperti unitPrice).
+      // Diskon dibulatkan ke bawah (floor) — selisih pembulatan rupiah di tahan toko.
+      const discountPercent = body.discountPercent
+      const discountAmount =
+        discountPercent > 0
+          ? Math.min(subtotal, Math.floor((subtotal * discountPercent) / 100))
+          : body.discountAmount
       if (discountAmount > subtotal) {
         throw new ApiError('DISCOUNT_TOO_LARGE', 'Diskon tidak boleh melebihi subtotal.', 400)
       }
@@ -255,6 +262,7 @@ export async function POST(req: NextRequest) {
           invoiceNumber,
           subtotal,
           discountAmount,
+          discountPercent,
           taxAmount,
           totalAmount,
           paidAmount: body.paidAmount,
@@ -287,7 +295,7 @@ export async function POST(req: NextRequest) {
         action: AUDIT_ACTIONS.TRANSACTION_CREATED,
         resourceType: 'Transaction',
         resourceId: transaction.id,
-        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod },
+        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod, discountPercent, discountAmount },
         ipAddress: ip,
         userAgent: ua,
       })

@@ -73,7 +73,7 @@ export async function GET() {
         orderBy: { createdAt: 'desc' },
         take: 200,
         select: {
-          id: true, invoiceNumber: true, subtotal: true, discountAmount: true, taxAmount: true,
+          id: true, invoiceNumber: true, subtotal: true, discountAmount: true, discountPercent: true, taxAmount: true,
           totalAmount: true, paidAmount: true, changeAmount: true, paymentMethod: true,
           status: true, refundedAmount: true, createdAt: true, customerId: true, notes: true,
           items: {
@@ -112,6 +112,7 @@ export async function GET() {
         invoiceNumber: t.invoiceNumber,
         subtotal: t.subtotal,
         discountAmount: t.discountAmount,
+        discountPercent: t.discountPercent,
         taxAmount: t.taxAmount,
         totalAmount: t.totalAmount,
         paidAmount: t.paidAmount,

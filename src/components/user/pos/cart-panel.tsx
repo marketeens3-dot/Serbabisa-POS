@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiClientError } from "@/lib/api-client";
-import { formatIDR, formatQty } from "@/lib/format";
+import { formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { ParkedCartsControls, type ParkedCart } from "@/components/user/pos/parked-carts";
 import { ParkedCartTip } from "@/components/user/pos/parked-cart-tip";
@@ -25,7 +25,10 @@ export function CartPanel({
   cart,
   subtotal,
   discount,
-  setDiscount,
+  discountMode,
+  discountInput,
+  setDiscountMode,
+  setDiscountInput,
   customerId,
   setCustomerId,
   customersVersion,
@@ -42,8 +45,14 @@ export function CartPanel({
 }: {
   cart: CartLine[]
   subtotal: number
+  /** Nominal diskon efektif (Rp) — hasil turunan mode+input (dihitung di pos-view). */
   discount: number
-  setDiscount: (v: number) => void
+  /** "rp" = nominal manual; "pct" = persen diterapkan ke seluruh item. */
+  discountMode: "rp" | "pct"
+  /** Nilai mentah input sesuai mode (Rp atau persen). */
+  discountInput: number
+  setDiscountMode: (v: "rp" | "pct") => void
+  setDiscountInput: (v: number) => void
   customerId: string | null
   setCustomerId: (v: string | null) => void
   customersVersion: number
@@ -238,13 +247,41 @@ export function CartPanel({
           </Popover>
         </div>
 
-        {/* Diskon */}
+        {/* Diskon — toggle Rp (nominal) / % (seluruh item) */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Diskon (Rp)</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Diskon</p>
+              <div
+                role="group"
+                aria-label="Satuan diskon"
+                className="inline-flex rounded-md border border-border/70 p-0.5 bg-muted/40"
+              >
+                {(["rp", "pct"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      // Ganti mode: nolkan input agar tidak ada nilai nyasar antar satuan.
+                      setDiscountMode(m)
+                      setDiscountInput(0)
+                    }}
+                    aria-pressed={discountMode === m}
+                    className={cn(
+                      "rounded px-2 py-0.5 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                      discountMode === m
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {m === "rp" ? "Rp" : "%"}
+                  </button>
+                ))}
+              </div>
+            </div>
             {discount > 0 && (
               <button
-                onClick={() => setDiscount(0)}
+                onClick={() => setDiscountInput(0)}
                 className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
                 aria-label="Hapus diskon"
               >
@@ -252,21 +289,43 @@ export function CartPanel({
               </button>
             )}
           </div>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={subtotal}
-            value={discount || ""}
-            placeholder="0"
-            onChange={(e) => {
-              const v = Math.max(0, Math.min(subtotal, Math.floor(Number(e.target.value) || 0)))
-              setDiscount(v)
-            }}
-            className="h-9 tabular"
-            aria-label="Diskon dalam rupiah"
-          />
-          {discount > subtotal && <p className="text-xs text-destructive">Diskon tidak boleh melebihi subtotal.</p>}
+          <div className="relative">
+            <Input
+              type="number"
+              inputMode={discountMode === "pct" ? "decimal" : "numeric"}
+              step={discountMode === "pct" ? "0.01" : "1"}
+              min={0}
+              max={discountMode === "pct" ? 100 : subtotal}
+              value={discountInput || ""}
+              placeholder="0"
+              onChange={(e) => {
+                const raw = Number(e.target.value) || 0
+                const v =
+                  discountMode === "pct"
+                    ? Math.max(0, Math.min(100, Math.round(raw * 100) / 100))
+                    : Math.max(0, Math.min(subtotal, Math.floor(raw)))
+                setDiscountInput(v)
+              }}
+              className="h-9 tabular pr-10"
+              aria-label={discountMode === "pct" ? "Diskon dalam persen" : "Diskon dalam rupiah"}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground tabular">
+              {discountMode === "pct" ? "%" : "Rp"}
+            </span>
+          </div>
+          {discountMode === "pct" ? (
+            <p className="text-xs text-muted-foreground tabular">
+              {discount > 0 ? (
+                <>
+                  <span className="font-medium text-foreground">{formatPercentID(discountInput)}</span> dari seluruh item = <span className="font-medium text-foreground">− {formatIDR(discount)}</span>
+                </>
+              ) : (
+                "Persen diskon berlaku ke semua item di keranjang."
+              )}
+            </p>
+          ) : (
+            discount > subtotal && <p className="text-xs text-destructive">Diskon tidak boleh melebihi subtotal.</p>
+          )}
         </div>
 
         {/* Totals */}
@@ -276,7 +335,7 @@ export function CartPanel({
             <span className="tabular font-medium text-foreground">{formatIDR(subtotal)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>Diskon</span>
+            <span>Diskon{discountMode === "pct" && discountInput > 0 ? ` (${formatPercentID(discountInput)})` : ""}</span>
             <span className="tabular font-medium text-foreground">- {formatIDR(discount)}</span>
           </div>
           <div className="flex justify-between items-center pt-2 border-t">

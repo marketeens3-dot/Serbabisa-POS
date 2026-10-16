@@ -112,6 +112,7 @@ export type TransactionDTO = {
   invoiceNumber: string
   subtotal: number
   discountAmount: number
+  discountPercent: number
   taxAmount: number
   totalAmount: number
   paidAmount: number

@@ -12,6 +12,13 @@ export function formatNumberID(amount: number): string {
   return new Intl.NumberFormat('id-ID').format(amount)
 }
 
+/** Persen diskon utk nota/label: 10 → "10%", 12.5 → "12,5%" (tanpa nol desimal tak perlu). */
+export function formatPercentID(percent: number): string {
+  if (!Number.isFinite(percent) || percent <= 0) return '0%'
+  const trimmed = Number.isInteger(percent) ? String(percent) : String(Number(percent.toFixed(2)))
+  return `${trimmed.replace('.', ',')}%`
+}
+
 function toDate(date: Date | string | number): Date {
   return date instanceof Date ? date : new Date(date)
 }

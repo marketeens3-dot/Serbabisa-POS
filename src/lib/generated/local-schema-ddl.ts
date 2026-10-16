@@ -113,6 +113,7 @@ CREATE TABLE "Transaction" (
     "invoiceNumber" TEXT NOT NULL,
     "subtotal" INTEGER NOT NULL,
     "discountAmount" INTEGER NOT NULL DEFAULT 0,
+    "discountPercent" REAL NOT NULL DEFAULT 0,
     "taxAmount" INTEGER NOT NULL DEFAULT 0,
     "totalAmount" INTEGER NOT NULL,
     "paidAmount" INTEGER NOT NULL,

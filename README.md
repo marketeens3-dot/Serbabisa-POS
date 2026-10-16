@@ -232,7 +232,7 @@ konkurensi SQLite dalam satu perintah.
 | Endpoint | Method | Catatan |
 |---|---|---|
 | `/api/auth/login` / `logout` / `me` / `change-password` | POST/POST/GET/POST | rate limit + lockout + audit; ganti password mencabut sesi lain |
-| `/api/transactions` | GET, POST | POST = checkout atomic (idempotencyKey, hitung ulang server-side, stok bersyarat) |
+| `/api/transactions` | GET, POST | POST = checkout atomic (idempotencyKey, hitung ulang server-side, stok bersyarat). Diskon: `discountPercent` 0-100 (diterapkan ke seluruh item, `discountAmount` dihitung ulang server) ATAU `discountAmount` nominal manual |
 | `/api/transactions/[id]` / `void` | GET, POST | void: hanya COMPLETED, alasan wajib, restock |
 | `/api/catalog`, `/api/catalog/[id]` | GET/POST, PATCH | SKU/barcode unik per tenant; soft delete + mutasi ADJUSTMENT |
 | `/api/categories`, `/api/customers` (+ `[id]`) | GET/POST, PATCH | phone ternormalisasi 62xxx |

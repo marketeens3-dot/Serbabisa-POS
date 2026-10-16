@@ -9,7 +9,7 @@ import { InvoiceRenderer, type InvoiceStore } from "@/components/invoice/invoice
 import { PrintableInvoice, usePrintInvoice } from "@/components/invoice/print-invoice";
 import { DEFAULT_INVOICE_CONFIG, type InvoiceTemplateConfig } from "@/lib/invoice";
 import { api, ApiClientError } from "@/lib/api-client";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatPercentID } from "@/lib/format";
 import type { SessionUserDTO, TransactionDTO, WaLinkResult } from "@/lib/types";
 
 const METHOD_LABELS: Record<string, string> = {
@@ -82,7 +82,10 @@ export function PosSuccess({
             <SummaryRow label="Total tagihan" value={formatIDR(transaction.totalAmount)} />
             <SummaryRow label="Dibayar" value={formatIDR(transaction.paidAmount)} />
             {transaction.discountAmount > 0 && (
-              <SummaryRow label="Diskon" value={`- ${formatIDR(transaction.discountAmount)}`} />
+              <SummaryRow
+                label={`Diskon${transaction.discountPercent > 0 ? ` (${formatPercentID(transaction.discountPercent)})` : ""}`}
+                value={`- ${formatIDR(transaction.discountAmount)}`}
+              />
             )}
             <SummaryRow label="Kembalian" value={formatIDR(transaction.changeAmount)} strong />
             {transaction.customerName && <SummaryRow label="Pelanggan" value={transaction.customerName} />}

@@ -41,6 +41,13 @@ const moneyField = z
   .min(0, 'Nilai tidak boleh negatif')
   .max(1_000_000_000, 'Nilai terlalu besar')
 
+// Persen diskon transaksi (0-100, maks 2 desimal — 12.5% sah, 12.55% tidak).
+const percentField = z
+  .number({ message: 'Persen harus berupa angka' })
+  .min(0, 'Persen tidak boleh negatif')
+  .max(100, 'Persen maksimal 100')
+  .refine((v) => Math.round(v * 100) === v * 100, 'Persen maksimal 2 desimal')
+
 const qtyField = z
   .number({ message: 'Jumlah harus berupa angka' })
   .min(0, 'Jumlah tidak boleh negatif')
@@ -156,6 +163,9 @@ export const checkoutSchema = z.object({
     .max(MAX_TRANSACTION_ITEMS, `Maksimal ${MAX_TRANSACTION_ITEMS} item per transaksi`),
   customerId: z.union([z.string().min(1), z.null()]).optional(),
   discountAmount: moneyField.default(0),
+  // Diskon persen untuk SELURUH item — server menghitung ulang discountAmount dari
+  // persen ini (nilai discountAmount dari client DIABAIKAN saat percent > 0).
+  discountPercent: percentField.default(0),
   taxAmount: moneyField.default(0),
   paymentMethod: enumField(['CASH', 'TRANSFER', 'QRIS', 'OTHER'] as const, 'Metode pembayaran tidak valid'),
   paidAmount: z

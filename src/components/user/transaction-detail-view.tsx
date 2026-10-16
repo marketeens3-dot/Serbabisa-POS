@@ -26,7 +26,7 @@ import { DEFAULT_INVOICE_CONFIG, type InvoiceTemplateConfig } from "@/lib/invoic
 import { useApp } from "@/components/app/app-context";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiClientError } from "@/lib/api-client";
-import { formatDateTimeLongID, formatIDR, formatQty } from "@/lib/format";
+import { formatDateTimeLongID, formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import type { InvoiceTemplateDTO, TransactionDTO, WaLinkResult } from "@/lib/types";
 
 export default function TransactionDetailView({ transactionId }: { transactionId: string }) {
@@ -288,7 +288,7 @@ export default function TransactionDetailView({ transactionId }: { transactionId
                     </div>
                     {tx.discountAmount > 0 && (
                       <div className="flex justify-between text-muted-foreground">
-                        <span>Diskon</span>
+                        <span>Diskon{tx.discountPercent > 0 ? ` (${formatPercentID(tx.discountPercent)})` : ""}</span>
                         <MoneyCell amount={-tx.discountAmount} className="font-medium text-foreground" />
                       </div>
                     )}

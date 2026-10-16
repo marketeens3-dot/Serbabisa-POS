@@ -168,6 +168,10 @@ model Transaction {
   invoiceNumber  String
   subtotal       Int
   discountAmount Int      @default(0)
+  // Persen diskon transaksi (0-100, maks 2 desimal) — diterapkan ke SELURUH item.
+  // Server selalu menghitung ulang discountAmount dari persen ini (anti price tampering);
+  // disimpan agar nota bisa menampilkan "Diskon 10%". 0 = diskon nominal/manual.
+  discountPercent Float  @default(0)
   taxAmount      Int      @default(0)
   totalAmount    Int
   paidAmount     Int

@@ -56,6 +56,8 @@ export type ParkedCart = {
   lines: ParkedCartLine[];
   customerId: string | null;
   discount: number;
+  /** Persen diskon saat diparkir (0 = mode Rp). Parkir lama tanpa field ini = mode Rp. */
+  discountPct?: number;
   parkedAt: string; // ISO
 };
 

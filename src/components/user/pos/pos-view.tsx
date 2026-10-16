@@ -64,7 +64,11 @@ export default function PosView() {
      terlihat. Di layar ≥ lg tab disembunyikan: katalog + keranjang berdampingan. */
   const [posTab, setPosTab] = useState<"catalog" | "cart">("catalog")
   const [customerId, setCustomerId] = useState<string | null>(null)
-  const [discount, setDiscount] = useState(0)
+  /* Diskon transaksi: mode "rp" (nominal manual) atau "pct" (persen diterapkan ke
+     SELURUH item di keranjang — otomatis jadi harga diskon). discountInput = nilai
+     mentah sesuai mode; discount (turunan) = nominal Rp efektif yang dikirim server. */
+  const [discountMode, setDiscountMode] = useState<"rp" | "pct">("rp")
+  const [discountInput, setDiscountInput] = useState(0)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [successTx, setSuccessTx] = useState<TransactionDTO | null>(null)
@@ -181,6 +185,13 @@ export default function PosView() {
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + Math.round(l.quantity * l.item.sellingPrice), 0), [cart])
   const cartCount = useMemo(() => cart.reduce((s, l) => s + l.quantity, 0), [cart])
+  // Nominal diskon efektif (Rp): mode % dibulatkan ke bawah — rumus SAMA dengan server
+  // (floor(subtotal × pct / 100)) agar angka di layar = angka di nota = angka di database.
+  const discount = useMemo(
+    () => (discountMode === "pct" ? Math.floor((subtotal * discountInput) / 100) : discountInput),
+    [discountMode, discountInput, subtotal]
+  )
+  const discountPercentSent = discountMode === "pct" ? discountInput : 0
 
   // Badge Keranjang "pop" saat jumlah bertambah (setelah cartCount terdefinisi).
   const prevCountRef = useRef(0)
@@ -201,6 +212,7 @@ export default function PosView() {
         items: cart.map((l) => ({ catalogItemId: l.item.id, quantity: l.quantity })),
         customerId,
         discountAmount: discount,
+        discountPercent: discountPercentSent,
         taxAmount: payload.taxAmount,
         paymentMethod: payload.paymentMethod,
         paidAmount: payload.paidAmount,
@@ -212,7 +224,8 @@ export default function PosView() {
       playCheckoutSuccess()
       setCart([])
       setCustomerId(null)
-      setDiscount(0)
+      setDiscountMode("rp")
+      setDiscountInput(0)
       setCheckoutOpen(false)
       void shift.refetch()
       if (!res.idempotentReplay) {
@@ -265,6 +278,7 @@ export default function PosView() {
       })),
       customerId,
       discount,
+      discountPct: discountPercentSent,
       parkedAt: new Date().toISOString(),
     }
     const ok = appendParkedCart(tenantId, snapshot)
@@ -274,7 +288,8 @@ export default function PosView() {
     }
     setCart([])
     setCustomerId(null)
-    setDiscount(0)
+    setDiscountMode("rp")
+    setDiscountInput(0)
     // Pengguna baru saja memarkir keranjang pertama — tips parkir tidak
     // diperlukan lagi (fitur sudah ditemukan).
     dismissParkedCartTip()
@@ -311,7 +326,15 @@ export default function PosView() {
       removeParkedCart(tenantId, pc.id)
       setCart(lines)
       setCustomerId(pc.customerId)
-      setDiscount(pc.discount)
+      // Pulihkan diskon: prioritas mode % bila tersimpan (fidelitas UX);
+      // parkir lama tanpa discountPct kembali sebagai nominal Rp.
+      if (pc.discountPct && pc.discountPct > 0) {
+        setDiscountMode("pct")
+        setDiscountInput(pc.discountPct)
+      } else {
+        setDiscountMode("rp")
+        setDiscountInput(pc.discount)
+      }
       if (dropped.length) {
         toast.warning(`Keranjang "${pc.label}" dilanjutkan. Item tidak tersedia dibuang: ${dropped.join(", ")}.`)
       } else {
@@ -331,7 +354,10 @@ export default function PosView() {
       cart={cart}
       subtotal={subtotal}
       discount={discount}
-      setDiscount={setDiscount}
+      discountMode={discountMode}
+      discountInput={discountInput}
+      setDiscountMode={setDiscountMode}
+      setDiscountInput={setDiscountInput}
       customerId={customerId}
       setCustomerId={setCustomerId}
       customersVersion={customersVersion}
@@ -472,6 +498,7 @@ export default function PosView() {
         cart={cart}
         subtotal={subtotal}
         discount={discount}
+        discountPercent={discountPercentSent}
         submitting={submitting}
         onSubmit={handleCheckout}
       />
