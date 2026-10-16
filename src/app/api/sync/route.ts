@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import { getSyncStatus, recordSyncOutcome, runSync } from '@/lib/sync/engine'
 import { getSessionUser } from '@/lib/auth'
+import { assertSameOrigin } from '@/lib/api'
 import { isLocalMode } from '@/lib/device'
 
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,8 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // Konsisten dengan route mutasi lain (klien native lolos — tanpa header Origin).
+    assertSameOrigin(req)
     const user = await getSessionUser()
     if (!user) {
       return NextResponse.json({ error: 'UNAUTHORIZED', message: 'Sesi berakhir.' }, { status: 401 })

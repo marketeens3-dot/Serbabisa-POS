@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
 
     let body: Uint8Array | string
     if (format === "xlsx") body = await renderXlsx(doc)
-    else if (format === "pdf") body = renderPdf(doc)
+    else if (format === "pdf") body = await renderPdf(doc)
     else body = renderCsv(doc)
 
     return new NextResponse(body as BodyInit, {

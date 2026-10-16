@@ -5,8 +5,12 @@
 // Karena itu mengaktifkan RLS TANPA policy = aman untuk aplikasi (pemilik tetap
 // akses penuh) sekaligus menutup total akses anon/authenticated via REST API.
 // JANGAN pakai FORCE RLS (akan membuat pemilik ikut terkena policy → app rusak).
-process.env.DATABASE_URL =
-  "postgresql://postgres.ckraoqmhpjcferjdcdrm:Ihsanneo%40_78@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=disable";
+// Keamanan: kredensial TIDAK di-hardcode — wajib lewat env DATABASE_URL:
+//   bash scripts/with-env.sh node scripts/enable-rls.js
+if (!process.env.DATABASE_URL) {
+  console.error("DATABASE_URL wajib diset. Jalankan: bash scripts/with-env.sh node scripts/enable-rls.js");
+  process.exit(1);
+}
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();
 

@@ -16,7 +16,10 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
   try {
-    const { dbMode } = await import('@/lib/db')
+    const { dbMode, initDbClient } = await import('@/lib/db')
+    // Muat client database lebih dulu (lazy utk SQLite — lihat db.ts), baru
+    // siapkan skema/PRAGMA lokal yang memakai proxy `db`.
+    await initDbClient()
     if (dbMode !== 'local') return
 
     const { ensureLocalDb } = await import('@/lib/local-db-bootstrap')

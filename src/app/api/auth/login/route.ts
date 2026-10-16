@@ -175,6 +175,13 @@ export async function POST(req: Request) {
     // `x-client: native`, sehingga JavaScript di browser tidak pernah
     //mendapat akses ke token (pemtoken tetap HttpOnly di jalur web).
     if (req.headers.get('x-client') === 'native') {
+      // Anti-bypass httpOnly: fetch dari BROWSER (termasuk same-origin oleh XSS)
+      // selalu menyertakan header Origin pada POST; klien native (Electron/React
+      // Native) tidak mengirim Origin. Bila ada Origin → tolak, supaya token
+      // mentah tidak bisa diminta lewat jalur native dari skrip browser.
+      if (req.headers.get('origin')) {
+        throw new ApiError('INVALID_CLIENT', 'Permintaan token native tidak sah.', 400)
+      }
       payload.sessionToken = token
       payload.expiresAt = expiresAt.toISOString()
     }

@@ -11,7 +11,7 @@ async function apiLogin() {
   const res = await fetch(`${BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-    body: JSON.stringify({ email: 'kasir@demo.local', password: 'Kasir#2026' }),
+    body: JSON.stringify({ email: 'kasir@demo.local', password: process.env.DEMO_KASIR_PASSWORD ?? '' }),
   })
   return (res.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
 }
@@ -51,7 +51,7 @@ function check(name, cond, detail = '') {
   await page.evaluate(() => localStorage.clear()) // mulai bersih (tanpa pin/parkiran lama)
   await page.reload({ waitUntil: 'networkidle' })
   await page.fill('input[type="email"]', 'kasir@demo.local')
-  await page.fill('input[type="password"]', 'Kasir#2026')
+  await page.fill('input[type="password"]', process.env.DEMO_KASIR_PASSWORD ?? '')
   await page.click('button[type="submit"]')
   await page.waitForURL('**/app**', { timeout: 30000 })
   await page.goto(`${BASE}/#/app/pos`, { waitUntil: 'networkidle' })

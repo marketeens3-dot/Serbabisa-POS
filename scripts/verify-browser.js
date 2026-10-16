@@ -1,6 +1,5 @@
 // Verifikasi end-to-end Serbabisa POS via Playwright
 // Golden path: buka / → render login → login kasir → POS view dengan data Supabase
-/* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("playwright");
 
 (async () => {
@@ -29,7 +28,7 @@ const { chromium } = require("playwright");
   const emailInput = page.locator('input[type="email"], input[name="email"], input[autocomplete*="username"]').first();
   await emailInput.fill("kasir@demo.local", { timeout: 15000 });
   const passInput = page.locator('input[type="password"]').first();
-  await passInput.fill("Kasir#2026", { timeout: 15000 });
+  await passInput.fill(process.env.DEMO_KASIR_PASSWORD || "", { timeout: 15000 });
   await page.screenshot({ path: "/home/z/my-project/download/verify-login.png" });
 
   const submit = page.locator('button[type="submit"], button:has-text("Masuk"), button:has-text("Login")').first();

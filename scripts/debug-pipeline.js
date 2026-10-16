@@ -1,5 +1,4 @@
 // Replikasi persis pipeline upload route untuk melihat ukuran webp vs png
-/* eslint-disable @typescript-eslint/no-require-imports */
 const sharp = require("sharp");
 
 async function main() {

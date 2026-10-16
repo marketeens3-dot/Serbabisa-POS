@@ -1,6 +1,10 @@
 // Hardening lanjutan: RLS untuk _prisma_migrations + audit function search_path
-process.env.DATABASE_URL =
-  "postgresql://postgres.ckraoqmhpjcferjdcdrm:Ihsanneo%40_78@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=disable";
+// Keamanan: kredensial TIDAK di-hardcode — wajib lewat env DATABASE_URL:
+//   bash scripts/with-env.sh node scripts/harden-supabase.js
+if (!process.env.DATABASE_URL) {
+  console.error("DATABASE_URL wajib diset. Jalankan: bash scripts/with-env.sh node scripts/harden-supabase.js");
+  process.exit(1);
+}
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();
 

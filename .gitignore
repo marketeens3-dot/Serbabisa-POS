@@ -101,3 +101,4 @@ prompt
 # di daftar yang sama dengan folder hasil unduhan — Akibatnya repository
 # GitHub tidak memuat satu pun dokumen keamanan, padahal klaim keamanan
 # aplikasi merujuk ke file-file tersebut.
+.scaffold-backup/

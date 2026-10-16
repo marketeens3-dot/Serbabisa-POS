@@ -43,7 +43,16 @@ export async function GET() {
       }),
       db.user.findMany({
         where: { role: ROLES.USER },
-        include: { tenant: true, _count: { select: { transactions: true } } },
+        // Select eksplisit — jangan tarik logoUrl (data URL ≤300KB) hanya untuk dibuang serializer.
+        include: {
+          tenant: {
+            select: {
+              id: true, businessName: true, slug: true, phone: true,
+              whatsappNumber: true, address: true, isActive: true, createdAt: true,
+            },
+          },
+          _count: { select: { transactions: true } },
+        },
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),

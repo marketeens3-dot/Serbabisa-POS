@@ -24,7 +24,7 @@ async function login() {
   const res = await fetch(`${BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
-    body: JSON.stringify({ email: 'kasir@demo.local', password: 'Kasir#2026' }),
+    body: JSON.stringify({ email: 'kasir@demo.local', password: process.env.DEMO_KASIR_PASSWORD ?? '' }),
   })
   const setCookie = res.headers.getSetCookie?.() ?? []
   const cookie = setCookie.map((c) => c.split(';')[0]).join('; ')

@@ -129,7 +129,7 @@ async function main() {
     const firstLogin = await fetch(origin + "/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", origin },
-      body: JSON.stringify({ email: "kasir@demo.local", password: "Kasir#2026" }),
+      body: JSON.stringify({ email: "kasir@demo.local", password: process.env.DEMO_KASIR_PASSWORD ?? "" }),
     }).then((r) => r.json().catch(() => ({})));
     check(
       "login ditolak karena belum pernah diaktivasi",

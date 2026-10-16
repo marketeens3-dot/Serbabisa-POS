@@ -174,12 +174,24 @@ function readEnvFile(file) {
 }
 
 function writeDefaultConfig() {
+  // KEAMANAN: DATABASE_URL (SUPERUSER seluruh DB multi-tenant) TIDAK lagi
+  // ditanam ke dalam .exe secara default — siapa pun yang memegang installer
+  // bisa mengekstraknya dan mengakses SEMUA tenant lewat koneksi itu.
+  // Default: .exe TANPA kredensial → user memasukkan koneksi via dialog
+  // "Aplikasi → Koneksi Database…" (config.json per-instalasi).
+  // Untuk perilaku lama (hanya utk .exe pribadi yang TIDAK dibagikan):
+  //   set DESKTOP_EMBED_DATABASE_URL=1 saat build.
   const env = { ...readEnvFile(p(".env")), ...readEnvFile(p(".env.local")) };
-  const databaseUrl = env.DATABASE_URL || process.env.DATABASE_URL || "";
-  if (!databaseUrl) {
+  const embed =
+    env.DESKTOP_EMBED_DATABASE_URL === "1" ||
+    process.env.DESKTOP_EMBED_DATABASE_URL === "1";
+  const databaseUrl = embed
+    ? env.DATABASE_URL || process.env.DATABASE_URL || ""
+    : "";
+  if (embed && !databaseUrl) {
     throw new Error(
-      "DATABASE_URL tidak ditemukan (.env / .env.local / environment).\n" +
-        "  Isi DATABASE_URL lebih dulu — nilainya akan tertanam sebagai koneksi bawaan di dalam .exe.",
+      "DESKTOP_EMBED_DATABASE_URL=1 tetapi DATABASE_URL tidak ditemukan (.env / .env.local / environment).\n" +
+        "  Isi DATABASE_URL lebih dulu, atau hapus DESKTOP_EMBED_DATABASE_URL untuk build tanpa kredensial.",
     );
   }
   const cfg = { databaseUrl, host: "127.0.0.1", port: 0 };
@@ -188,8 +200,11 @@ function writeDefaultConfig() {
     JSON.stringify(cfg, null, 2) + "\n",
     "utf8",
   );
-  const masked = databaseUrl.replace(/(:\/\/[^:]+:)([^@]+)@/, "$1****@");
-  log(`✓ default-config.json  DATABASE_URL=${masked}`);
+  log(
+    embed
+      ? `✓ default-config.json  DATABASE_URL=${databaseUrl.replace(/(:\/\/[^:]+:)([^@]+)@/, "$1****@")} (TERTANAM — jangan bagikan .exe ini!)`
+      : "✓ default-config.json  tanpa kredensial — koneksi diisi user via dialog",
+  );
 }
 
 // ---------------------------------------------------------------------------

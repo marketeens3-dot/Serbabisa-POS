@@ -11,7 +11,7 @@ const sharp = require('sharp')
 const BASE = 'http://localhost:3000'
 const OUT = '/home/z/my-project/download'
 let pass = 0, fail = 0
-const check = (ok, label) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`); ok ? pass++ : fail++ }
+const check = (ok, label) => { console.log(`${ok ? "PASS" : "FAIL"}  ${label}`); if (ok) pass++; else fail++ }
 
 ;(async () => {
   const browser = await chromium.launch()
@@ -24,7 +24,7 @@ const check = (ok, label) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`);
   // Login
   await page.goto(BASE, { waitUntil: 'networkidle' })
   await page.fill('input[type="email"]', 'kasir@demo.local')
-  await page.fill('input[type="password"]', 'Kasir#2026')
+  await page.fill('input[type="password"]', process.env.DEMO_KASIR_PASSWORD ?? '')
   await page.click('button[type="submit"]')
   await page.waitForURL('**/app**', { timeout: 30000 })
   await page.waitForLoadState('networkidle')

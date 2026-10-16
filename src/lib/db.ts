@@ -27,12 +27,18 @@
  *   Union `CloudClient | LocalClient` akan menggagalkan setiap pemanggilan
  *   method di TypeScript, jadi casting di satu titik ini memang disengaja.
  *
+ * LAZY LOADING (penting untuk Vercel):
+ *   @serbabisa/prisma-local (±42 MB) TIDAK di-import statis di sini — hanya
+ *   via dynamic import di initDbClient() bila dbMode === 'local'. Di Vercel
+ *   (cloud) paket itu tidak pernah dimuat dan file-nya dikecualikan dari
+ *   output tracing (next.config.ts) → serverless function jauh lebih kecil,
+ *   cold start lebih cepat. Build desktop/self-host tetap menyertakannya.
+ *
  * Prisma Client CLOUD hanya dipakai di src/lib/sync/* — tidak pernah menjadi
  * sumber kebenaran saat aplikasi berjalan local-first.
  */
 
 import { PrismaClient } from '@prisma/client'
-import { PrismaClient as LocalPrismaClient } from '@serbabisa/prisma-local'
 
 export type DbMode = 'local' | 'cloud'
 
@@ -49,19 +55,48 @@ const globalForPrisma = globalThis as unknown as {
   __serbabisaDb?: PrismaClient
 }
 
-function createClient(): PrismaClient {
-  if (dbMode === 'local') {
-    return new LocalPrismaClient({
-      log: ['error', 'warn'],
-    }) as unknown as PrismaClient
-  }
-  return new PrismaClient({
-    log: ['error', 'warn'],
-  })
+function createCloudClient(): PrismaClient {
+  return new PrismaClient({ log: ['error', 'warn'] })
 }
 
-// Hot reload Next.js mengevaluasi ulang modul — simpan di global agar tidak
-// membuka koneksi database baru pada setiap reload.
-export const db: PrismaClient = globalForPrisma.__serbabisaDb ?? createClient()
+/** Pasang client hasil init (dipanggil initDbClient / instrumentation). */
+export function setDbClient(client: PrismaClient): void {
+  globalForPrisma.__serbabisaDb = client
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.__serbabisaDb = db
+/**
+ * Muat client database sekali per proses (idempoten).
+ * - cloud: sinkron dari @prisma/client (paket kecil, selalu tersedia).
+ * - local: dynamic import ke src/lib/db-local.ts (lihat catatan lazy di atas).
+ * instrumentation.register() memanggilnya saat server start, sebelum
+ * request pertama dilayani.
+ */
+export async function initDbClient(): Promise<void> {
+  if (globalForPrisma.__serbabisaDb) return
+  if (dbMode === 'cloud') {
+    globalForPrisma.__serbabisaDb = createCloudClient()
+    return
+  }
+  const { createLocalClient } = await import('./db-local')
+  globalForPrisma.__serbabisaDb = createLocalClient() as unknown as PrismaClient
+}
+
+/**
+ * Proxy `db` — seluruh aplikasi tetap menulis `db.model.method()` tanpa peduli
+ * mode. Cloud: client dibuat on-demand pada akses pertama. Local: WAJIB lewat
+ * initDbClient() dulu (dijalankan instrumentation saat server start); akses
+ * sebelum siap melempar error yang jelas, bukan gagal diam-diam.
+ */
+export const db: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    let real = globalForPrisma.__serbabisaDb
+    if (!real) {
+      if (dbMode !== 'cloud') {
+        throw new Error('Database lokal belum siap — initDbClient() belum dijalankan di server ini.')
+      }
+      real = globalForPrisma.__serbabisaDb = createCloudClient()
+    }
+    const value = Reflect.get(real as object, prop, real) as unknown
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(real) : value
+  },
+})

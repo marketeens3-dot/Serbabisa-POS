@@ -3,9 +3,10 @@
 // - XLSX: ExcelJS — angka asli (bisa dihitung ulang), header beku, autoFilter.
 // - PDF : jsPDF + jspdf-autotable — siap cetak/kirim, footer halaman otomatis.
 // - CSV : ringan, kompatibel semua (BOM UTF-8 agar Excel membaca dengan benar).
-import ExcelJS from "exceljs"
-import { jsPDF } from "jspdf"
-import autoTable from "jspdf-autotable"
+//
+// PERFORMA: exceljs (±23 MB) & jspdf (±29 MB) di-import DINAMIS di dalam
+// renderXlsx/renderPdf — request CSV (format paling sering) tidak pernah
+// memuatnya, cold start serverless /api/export jauh lebih ringan.
 import { formatDateTimeID, formatNumberID } from "./format"
 
 export type ExportCell = string | number | null | undefined
@@ -94,6 +95,7 @@ function columnWidths(t: ExportTable): number[] {
 }
 
 export async function renderXlsx(doc: ExportDoc): Promise<Uint8Array> {
+  const ExcelJS = (await import("exceljs")).default
   const wb = new ExcelJS.Workbook()
   wb.creator = "Serbabisa POS"
   wb.created = new Date()
@@ -194,7 +196,10 @@ const moneyStr = (n: number) => `Rp ${formatNumberID(n)}`
 
 type LastAutoTable = { lastAutoTable?: { finalY: number } }
 
-function drawFooter(pdf: jsPDF, subtitle?: string): void {
+// Tipe saja (type-only, terhapus saat build) — runtime jsPDF dimuat dinamis di renderPdf.
+type JsPdf = InstanceType<(typeof import("jspdf"))["jsPDF"]>
+
+function drawFooter(pdf: JsPdf, subtitle?: string): void {
   const h = pdf.internal.pageSize.getHeight()
   const w = pdf.internal.pageSize.getWidth()
   pdf.setDrawColor(222, 226, 230)
@@ -208,7 +213,9 @@ function drawFooter(pdf: jsPDF, subtitle?: string): void {
   pdf.text(`Hal. ${pdf.getNumberOfPages()}`, w - 12, h - 6, { align: "right" })
 }
 
-export function renderPdf(doc: ExportDoc): Uint8Array {
+export async function renderPdf(doc: ExportDoc): Promise<Uint8Array> {
+  const { jsPDF } = await import("jspdf")
+  const autoTable = (await import("jspdf-autotable")).default
   // Tabel lebar (≥10 kolom) → landscape agar kolom tidak terlalu sempit.
   const wide = doc.sections.some((s) => s.table.headers.length >= 10)
   const pdf = new jsPDF({ orientation: wide ? "landscape" : "portrait", unit: "mm", format: "a4" })

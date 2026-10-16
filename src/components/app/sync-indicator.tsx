@@ -64,9 +64,12 @@ export default function SyncIndicator() {
 
   useEffect(() => {
     void load();
+    // Mode cloud (bukan desktop): cukup satu cek awal — jangan polling tiap 60
+    // detik (masing-masing poll = 1 query sesi ke DB + 1 invocation serverless).
+    if (status && !status.enabled) return;
     const t = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, status?.enabled]);
 
   const runNow = useCallback(async () => {
     setBusy(true);

@@ -38,7 +38,16 @@ export async function GET(req: NextRequest) {
       db.user.count({ where }),
       db.user.findMany({
         where,
-        include: { tenant: true, _count: { select: { transactions: true } } },
+        // Select eksplisit — jangan tarik logoUrl (data URL ≤300KB) hanya untuk dibuang serializer.
+        include: {
+          tenant: {
+            select: {
+              id: true, businessName: true, slug: true, phone: true,
+              whatsappNumber: true, address: true, isActive: true, createdAt: true,
+            },
+          },
+          _count: { select: { transactions: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take,

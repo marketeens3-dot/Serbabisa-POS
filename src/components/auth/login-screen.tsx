@@ -179,20 +179,6 @@ export default function LoginScreen() {
             </form>
           </div>
 
-          <div className="mt-5 rounded-xl border border-dashed border-border/60 bg-muted/40 p-4">
-            <p className="text-xs font-medium text-muted-foreground">Akun demo (lingkungan pengembangan)</p>
-            <div className="mt-2 grid gap-1 text-sm tabular">
-              <p>
-                <span className="text-muted-foreground">Super Admin:</span> admin@serbabisa.local
-                <span className="text-muted-foreground"> / </span> Serbabisa#2026
-              </p>
-              <p>
-                <span className="text-muted-foreground">Kasir:</span> kasir@demo.local
-                <span className="text-muted-foreground"> / </span> Kasir#2026
-              </p>
-            </div>
-          </div>
-
           <p className="mt-6 text-center text-xs text-muted-foreground">
             © 2026 Serbabisa — POS Kasir untuk Produk &amp; Jasa
           </p>

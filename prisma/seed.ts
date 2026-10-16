@@ -13,10 +13,21 @@ import { BUILTIN_TEMPLATE_PRESETS } from '../src/lib/invoice'
 
 const db = new PrismaClient()
 
+// Keamanan: TIDAK ADA password default — env wajib diisi (lihat .env.example).
+// Jalankan seed via: bash scripts/with-env.sh bun run prisma/seed.ts
+function requiredEnv(key: string): string {
+  const v = process.env[key]
+  if (!v || !v.trim()) {
+    console.error(`[seed] ENV ${key} wajib diisi (password tidak lagi punya default bawaan).`)
+    process.exit(1)
+  }
+  return v
+}
+
 const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL ?? 'admin@serbabisa.local').toLowerCase()
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD ?? 'Serbabisa#2026'
+const SUPER_ADMIN_PASSWORD = requiredEnv('SUPER_ADMIN_PASSWORD')
 const DEMO_KASIR_EMAIL = 'kasir@demo.local'
-const DEMO_KASIR_PASSWORD = process.env.DEMO_KASIR_PASSWORD ?? 'Kasir#2026'
+const DEMO_KASIR_PASSWORD = requiredEnv('DEMO_KASIR_PASSWORD')
 
 async function main() {
   // 1) Super Admin

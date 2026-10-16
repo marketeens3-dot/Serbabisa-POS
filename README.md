@@ -170,14 +170,9 @@ npm run dev               # http://localhost:3000
 
 > ⚠️ Karakter khusus di password **wajib** di-percent-encode (mis. `@` → `%40`).
 
-Kredensial demo dari seed — **DEVELOPMENT ONLY, ganti sebelum production**:
-
-| Peran | Email | Password |
-|---|---|---|
-| SUPER_ADMIN | `admin@serbabisa.local` | `Serbabisa#2026` |
-| USER (Kasir) | `kasir@demo.local` | `Kasir#2026` |
-
-Override via env saat seed: `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `DEMO_KASIR_PASSWORD`.
+Kredensial demo tidak diletakkan di repo (keamanan). Password akun diatur via env
+saat seed/rotate: `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `DEMO_KASIR_PASSWORD` —
+lihat `.env.example`. Ganti password akun demo sebelum dipakai production.
 
 ## Deploy ke Vercel (langkah demi langkah)
 

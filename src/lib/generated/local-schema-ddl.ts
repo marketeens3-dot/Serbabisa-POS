@@ -2,7 +2,7 @@
 //
 // DDL untuk membuat database SQLite lokal saat first-run. Dipakai oleh
 // src/lib/local-db-bootstrap.ts supaya .exe tidak memerlukan Prisma CLI.
-// Sumber: prisma/schema.sqlite.prisma (17 tabel, 46 index)
+// Sumber: prisma/schema.sqlite.prisma (17 tabel, 48 index)
 
 /** DDL SQLite lengkap untuk skema aplikasi (kosong → siap pakai). */
 export const LOCAL_SCHEMA_DDL = `-- CreateTable
@@ -334,6 +334,12 @@ CREATE INDEX "Transaction_tenantId_createdAt_idx" ON "Transaction"("tenantId", "
 
 -- CreateIndex
 CREATE INDEX "Transaction_tenantId_status_idx" ON "Transaction"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "Transaction_tenantId_status_createdAt_idx" ON "Transaction"("tenantId", "status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "Transaction_cashSessionId_status_idx" ON "Transaction"("cashSessionId", "status");
 
 -- CreateIndex
 CREATE INDEX "Transaction_customerId_idx" ON "Transaction"("customerId");

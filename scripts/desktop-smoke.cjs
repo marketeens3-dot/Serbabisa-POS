@@ -181,7 +181,7 @@ app.whenReady().then(async () => {
     // 5) Login lewat API dari dalam server desktop
     console.log("\n▸ [4/4] Login API di server yang di-host desktop");
     const email = process.env.SMOKE_EMAIL || "kasir@demo.local";
-    const password = process.env.SMOKE_PASSWORD || "Kasir#2026";
+    const password = process.env.SMOKE_PASSWORD || process.env.DEMO_KASIR_PASSWORD || "";
     const login = await win.webContents.executeJavaScript(`(async () => {
       const res = await fetch('/api/auth/login', {
         method: 'POST',

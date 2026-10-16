@@ -10,6 +10,7 @@ import {
   verifyPassword,
 } from '@/lib/auth'
 import { ApiError, assertSameOrigin, getClientIp, getUserAgent, handleApiError } from '@/lib/api'
+import { rateLimit } from '@/lib/rate-limit'
 import { logAudit } from '@/lib/audit'
 import { AUDIT_ACTIONS } from '@/lib/constants'
 
@@ -19,6 +20,12 @@ export async function POST(req: Request) {
     const sessionUser = await getSessionUser()
     if (!sessionUser) {
       throw new ApiError('UNAUTHORIZED', 'Sesi berakhir. Silakan masuk kembali.', 401)
+    }
+
+    // Rate limit per akun: mencegah brute force offline terhadap verifikasi
+    // password lama lewat sesi yang bocor/ditinggal terbuka.
+    if (!rateLimit(`pwchange:${sessionUser.id}`, 10)) {
+      throw new ApiError('RATE_LIMITED', 'Terlalu banyak percobaan. Coba lagi sebentar lagi.', 429)
     }
 
     const body = changePasswordSchema.parse(await req.json())

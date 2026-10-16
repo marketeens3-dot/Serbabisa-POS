@@ -1,7 +1,10 @@
 // Forensik: siapa yang mengubah Tenant.phone? Cek audit_logs + tenant row
-/* eslint-disable @typescript-eslint/no-require-imports */
-process.env.DATABASE_URL =
-  "postgresql://postgres.ckraoqmhpjcferjdcdrm:Ihsanneo%40_78@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=disable";
+// Keamanan: kredensial TIDAK di-hardcode — wajib lewat env DATABASE_URL:
+//   bash scripts/with-env.sh node scripts/forensic-tenant.js
+if (!process.env.DATABASE_URL) {
+  console.error("DATABASE_URL wajib diset. Jalankan: bash scripts/with-env.sh node scripts/forensic-tenant.js");
+  process.exit(1);
+}
 process.env.SERBABISA_DB = "cloud";
 const { PrismaClient } = require("@prisma/client");
 const db = new PrismaClient();

@@ -5,7 +5,7 @@ async function login() {
   const res = await fetch(BASE + "/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json", Origin: BASE },
-    body: JSON.stringify({ email: "kasir@demo.local", password: "Kasir#2026" }),
+    body: JSON.stringify({ email: "kasir@demo.local", password: process.env.DEMO_KASIR_PASSWORD ?? "" }),
   });
   if (res.status !== 200) throw new Error("login gagal " + res.status);
   return res.headers

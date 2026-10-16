@@ -5,7 +5,6 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { toJpeg } from "html-to-image";
 import { InvoiceRenderer, type InvoiceStore } from "@/components/invoice/invoice-renderer";
 import type { InvoiceTemplateConfig } from "@/lib/invoice";
 import type { TransactionDTO } from "@/lib/types";
@@ -64,6 +63,9 @@ export function useInvoiceJpg({
     if (!node || !transaction || downloading) return
     setDownloading(true)
     try {
+      // Dynamic import: html-to-image hanya dimuat saat tombol unduh ditekan —
+      // bundle halaman POS tidak dibebani (library ini tidak dipakai jalur lain).
+      const { toJpeg } = await import("html-to-image")
       const options = {
         quality: JPEG_QUALITY,
         backgroundColor: "#ffffff",

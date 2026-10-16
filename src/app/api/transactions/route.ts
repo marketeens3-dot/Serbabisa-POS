@@ -293,18 +293,18 @@ export async function POST(req: NextRequest) {
       })
 
       // ---------- MUTASI STOK + AUDIT ----------
-      for (const line of lines) {
-        if (line.itemType === 'PRODUCT') {
-          await tx.inventoryMovement.create({
-            data: {
-              tenantId,
-              catalogItemId: line.catalogItemId,
-              transactionId: transaction.id,
-              movementType: 'SALE',
-              quantity: line.quantity,
-            },
-          })
-        }
+      // createMany: satu round-trip ke DB alih-alih await per baris (keranjang besar).
+      const productLines = lines.filter((line) => line.itemType === 'PRODUCT')
+      if (productLines.length > 0) {
+        await tx.inventoryMovement.createMany({
+          data: productLines.map((line) => ({
+            tenantId,
+            catalogItemId: line.catalogItemId,
+            transactionId: transaction.id,
+            movementType: 'SALE',
+            quantity: line.quantity,
+          })),
+        })
       }
       await logAudit(tx, {
         actorUserId: user.id,

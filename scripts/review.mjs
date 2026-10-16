@@ -13,9 +13,9 @@
  */
 const O = process.env.REVIEW_ORIGIN ?? "http://localhost:3100";
 const EMAIL = process.env.REVIEW_EMAIL ?? "kasir@demo.local";
-const PASSWORD = process.env.REVIEW_PASSWORD ?? "Kasir#2026";
+const PASSWORD = process.env.REVIEW_PASSWORD ?? process.env.DEMO_KASIR_PASSWORD ?? "";
 const ADMIN_EMAIL = process.env.REVIEW_ADMIN_EMAIL ?? "admin@serbabisa.local";
-const ADMIN_PASSWORD = process.env.REVIEW_ADMIN_PASSWORD ?? "Serbabisa#2026";
+const ADMIN_PASSWORD = process.env.REVIEW_ADMIN_PASSWORD ?? process.env.SUPER_ADMIN_PASSWORD ?? "";
 
 const pass = [];
 const fail = [];

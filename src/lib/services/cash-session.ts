@@ -18,30 +18,37 @@ export type CashSessionTotals = CashSessionSummaryDTO & {
  * Transaksi REFUNDED (net 0) dihitung 0; VOID tidak dihitung.
  */
 export async function computeSessionTotals(tx: Tx, sessionId: string, openingCash: number): Promise<CashSessionTotals> {
-  const rows = await tx.transaction.findMany({
+  // groupBy di SQL (bukan fetch semua baris + reduce di JS): endpoint ini di-poll
+  // tiap 30 detik per kasir (use-shift) → beban DB konstan, bukan tumbuh dengan
+  // jumlah transaksi dalam shift. Wajib dipakai dengan index (cashSessionId, status).
+  const groups = await tx.transaction.groupBy({
+    by: ['paymentMethod'],
     where: { cashSessionId: sessionId, status: { in: ['COMPLETED', 'REFUNDED'] } },
-    select: { paymentMethod: true, totalAmount: true, refundedAmount: true },
+    _count: { _all: true },
+    _sum: { totalAmount: true, refundedAmount: true },
   })
 
   let cashTotal = 0
   let nonCashTotal = 0
-  const methodMap = new Map<string, { count: number; total: number }>()
-  for (const r of rows) {
-    const net = r.totalAmount - (r.refundedAmount ?? 0)
-    const agg = methodMap.get(r.paymentMethod) ?? { count: 0, total: 0 }
-    agg.count += 1
-    agg.total += net
-    methodMap.set(r.paymentMethod, agg)
-    if (r.paymentMethod === 'CASH') cashTotal += net
+  let transactionCount = 0
+  const byMethod: { method: string; count: number; total: number }[] = []
+  for (const g of groups) {
+    const count = g._count._all
+    // Net baris = totalAmount − refundedAmount (baris REFUNDED penuh = 0; VOID tak masuk where).
+    const net = (g._sum.totalAmount ?? 0) - (g._sum.refundedAmount ?? 0)
+    transactionCount += count
+    byMethod.push({ method: g.paymentMethod, count, total: net })
+    if (g.paymentMethod === 'CASH') cashTotal += net
     else nonCashTotal += net
   }
+  byMethod.sort((a, b) => a.method.localeCompare(b.method))
 
   return {
-    transactionCount: rows.length,
+    transactionCount,
     cashTotal,
     nonCashTotal,
     total: cashTotal + nonCashTotal,
     expectedCash: openingCash + cashTotal,
-    byMethod: Array.from(methodMap.entries()).map(([method, v]) => ({ method, ...v })),
+    byMethod,
   }
 }
