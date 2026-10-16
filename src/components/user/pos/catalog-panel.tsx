@@ -206,7 +206,7 @@ export function CatalogPanel({
                 onPointerCancel={cancelPress}
                 onContextMenu={(e) => e.preventDefault()}
                 className="group/qs relative shrink-0 inline-flex items-center gap-2.5 h-12 rounded-xl border border-border/70 bg-card pl-3.5 pr-3 shadow-sm transition-all select-none hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]"
-                aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice)}, terjual ${formatQty(soldQty)} kali dalam 30 hari. Tahan untuk memasukkan jumlah.`}
+                aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}${(item.discountAmount ?? 0) > 0 ? ` (diskon dari ${formatIDR(item.sellingPrice)})` : ""}, terjual ${formatQty(soldQty)} kali dalam 30 hari. Tahan untuk memasukkan jumlah.`}
               >
                 <span className="size-6 rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 flex items-center justify-center shrink-0" aria-hidden="true">
                   {item.type === "PRODUCT" ? <Package className="size-3.5" /> : <Wrench className="size-3.5" />}
@@ -214,7 +214,18 @@ export function CatalogPanel({
                 <span className="flex flex-col items-start leading-tight">
                   <span className="text-sm font-medium max-w-[150px] truncate">{item.name}</span>
                   <span className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-primary font-semibold tabular">{formatIDR(item.sellingPrice)}</span>
+                    {(item.discountAmount ?? 0) > 0 ? (
+                      <>
+                        <span className="text-[11px] text-primary font-semibold tabular">
+                          {formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground line-through tabular">
+                          {formatIDR(item.sellingPrice)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-primary font-semibold tabular">{formatIDR(item.sellingPrice)}</span>
+                    )}
                     <span className="text-[10px] text-muted-foreground tabular" aria-hidden="true">·</span>
                     <span className="text-[10px] text-muted-foreground tabular">{formatQty(soldQty)}× terjual</span>
                   </span>
@@ -376,7 +387,7 @@ export function CatalogPanel({
                     ? "opacity-60 cursor-not-allowed"
                     : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
                 )}
-                aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice)}${outOfStock ? ", stok habis" : ""}. Tahan untuk memasukkan jumlah.`}
+                aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}${(item.discountAmount ?? 0) > 0 ? ` (diskon dari ${formatIDR(item.sellingPrice)})` : ""}${outOfStock ? ", stok habis" : ""}. Tahan untuk memasukkan jumlah.`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <span
@@ -397,13 +408,20 @@ export function CatalogPanel({
                 </div>
                 <p className="mt-2.5 text-sm font-medium leading-tight line-clamp-2 min-h-[2.4em]">{item.name}</p>
                 <div className="mt-auto pt-2 flex items-center justify-between gap-2">
-                  <span
-                    className={cn(
-                      "text-sm font-semibold tabular",
-                      outOfStock ? "text-muted-foreground line-through" : "text-primary"
+                  <span className="flex flex-col items-start leading-tight">
+                    <span
+                      className={cn(
+                        "text-sm font-semibold tabular",
+                        outOfStock ? "text-muted-foreground line-through" : "text-primary"
+                      )}
+                    >
+                      {formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}
+                    </span>
+                    {(item.discountAmount ?? 0) > 0 && !outOfStock && (
+                      <span className="text-[10px] text-muted-foreground line-through tabular">
+                        {formatIDR(item.sellingPrice)}
+                      </span>
                     )}
-                  >
-                    {formatIDR(item.sellingPrice)}
                   </span>
                   {item.type === "PRODUCT" ? (
                     outOfStock ? (

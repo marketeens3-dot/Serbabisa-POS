@@ -238,6 +238,12 @@ export default function TransactionDetailView({ transactionId }: { transactionId
                               {item.itemType === "PRODUCT" ? "Produk" : "Jasa"}
                               {item.skuSnapshot ? ` · ${item.skuSnapshot}` : ""}
                             </p>
+                            {(item.discountAmount ?? 0) > 0 && (
+                              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                Diskon{(item.discountPercent ?? 0) > 0 ? ` ${formatPercentID(item.discountPercent ?? 0)}` : ""} −{" "}
+                                {formatIDR(item.discountAmount ?? 0)}
+                              </p>
+                            )}
                           </TableCell>
                           <TableCell className="text-right tabular">
                             {formatQty(item.quantity)}
@@ -284,11 +290,26 @@ export default function TransactionDetailView({ transactionId }: { transactionId
                   <div className="py-3.5 space-y-2.5 text-sm">
                     <div className="flex justify-between text-muted-foreground">
                       <span>Subtotal</span>
-                      <MoneyCell amount={tx.subtotal} className="font-medium text-foreground" />
+                      <MoneyCell
+                        amount={tx.subtotal + (tx.items ?? []).reduce((s, i) => s + (i.discountAmount ?? 0), 0)}
+                        className="font-medium text-foreground"
+                      />
                     </div>
+                    {(tx.items ?? []).some((i) => (i.discountAmount ?? 0) > 0) && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Diskon item</span>
+                        <MoneyCell
+                          amount={-(tx.items ?? []).reduce((s, i) => s + (i.discountAmount ?? 0), 0)}
+                          className="font-medium text-amber-700 dark:text-amber-400"
+                        />
+                      </div>
+                    )}
                     {tx.discountAmount > 0 && (
                       <div className="flex justify-between text-muted-foreground">
-                        <span>Diskon{tx.discountPercent > 0 ? ` (${formatPercentID(tx.discountPercent)})` : ""}</span>
+                        <span>
+                          Diskon{(tx.items ?? []).some((i) => (i.discountAmount ?? 0) > 0) ? " toko" : ""}
+                          {tx.discountPercent > 0 ? ` (${formatPercentID(tx.discountPercent)})` : ""}
+                        </span>
                         <MoneyCell amount={-tx.discountAmount} className="font-medium text-foreground" />
                       </div>
                     )}

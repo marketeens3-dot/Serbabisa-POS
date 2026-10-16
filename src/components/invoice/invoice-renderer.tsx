@@ -36,6 +36,11 @@ export function InvoiceRenderer({
 }) {
   const isThermal = config.paperSize === "58mm" || config.paperSize === "80mm"
   const items = transaction.items ?? []
+  // Diskon per item: nota menampilkan baris diskon di tiap item + baris "Diskon
+  // item" pada ringkasan. Subtotal nota = bruto (Σ baris) supaya aritmetika
+  // selalu rekon: Subtotal − Diskon item − Diskon transaksi = TOTAL.
+  const itemDiscountTotal = items.reduce((s, i) => s + (i.discountAmount ?? 0), 0)
+  const grossSubtotal = transaction.subtotal + itemDiscountTotal
   const style: React.CSSProperties = {
     fontSize: `${config.fontSize * scale}px`,
     lineHeight: config.lineSpacing,
@@ -104,8 +109,16 @@ export function InvoiceRenderer({
                     <span>
                       {formatQty(item.quantity)} × {formatIDR(item.unitPrice)}
                     </span>
-                    <span className="font-medium">{formatIDR(item.subtotal)}</span>
+                    <span className="font-medium">{formatIDR(item.subtotal + (item.discountAmount ?? 0))}</span>
                   </div>
+                  {(item.discountAmount ?? 0) > 0 && (
+                    <div className="flex justify-between tabular leading-tight opacity-90">
+                      <span>
+                        Diskon{(item.discountPercent ?? 0) > 0 ? ` ${formatPercentID(item.discountPercent ?? 0)}` : ""}
+                      </span>
+                      <span>- {formatIDR(item.discountAmount ?? 0)}</span>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -115,10 +128,13 @@ export function InvoiceRenderer({
 
         {/* Totals */}
         <div className="space-y-0.5 tabular">
-          <Row label="Subtotal" value={formatIDR(transaction.subtotal)} />
+          <Row label="Subtotal" value={formatIDR(grossSubtotal)} />
+          {itemDiscountTotal > 0 && <Row label="Diskon item" value={`- ${formatIDR(itemDiscountTotal)}`} />}
           {transaction.discountAmount > 0 && (
             <Row
-              label={`Diskon${transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""}`}
+              label={`Diskon${itemDiscountTotal > 0 ? " toko" : ""}${
+                transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""
+              }`}
               value={`- ${formatIDR(transaction.discountAmount)}`}
             />
           )}
@@ -201,10 +217,16 @@ export function InvoiceRenderer({
               <td className="py-2 px-2">
                 <p className="font-medium">{item.itemNameSnapshot}</p>
                 {config.showSku && item.skuSnapshot && <p className="opacity-60 text-xs">{item.skuSnapshot}</p>}
+                {(item.discountAmount ?? 0) > 0 && (
+                  <p className="text-xs font-medium" style={{ color: accent }}>
+                    Diskon{(item.discountPercent ?? 0) > 0 ? ` ${formatPercentID(item.discountPercent ?? 0)}` : ""} −{" "}
+                    {formatIDR(item.discountAmount ?? 0)}
+                  </p>
+                )}
               </td>
               <td className="py-2 px-2 text-right tabular">{formatQty(item.quantity)}</td>
               <td className="py-2 px-2 text-right tabular">{formatIDR(item.unitPrice)}</td>
-              <td className="py-2 px-2 text-right tabular font-medium">{formatIDR(item.subtotal)}</td>
+              <td className="py-2 px-2 text-right tabular font-medium">{formatIDR(item.subtotal + (item.discountAmount ?? 0))}</td>
             </tr>
           ))}
         </tbody>
@@ -212,10 +234,13 @@ export function InvoiceRenderer({
 
       <div className="flex justify-end mt-4">
         <div className="w-64 space-y-1 tabular">
-          <Row label="Subtotal" value={formatIDR(transaction.subtotal)} />
+          <Row label="Subtotal" value={formatIDR(grossSubtotal)} />
+          {itemDiscountTotal > 0 && <Row label="Diskon item" value={`- ${formatIDR(itemDiscountTotal)}`} />}
           {transaction.discountAmount > 0 && (
             <Row
-              label={`Diskon${transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""}`}
+              label={`Diskon${itemDiscountTotal > 0 ? " toko" : ""}${
+                transaction.discountPercent > 0 ? ` ${formatPercentID(transaction.discountPercent)}` : ""
+              }`}
               value={`- ${formatIDR(transaction.discountAmount)}`}
             />
           )}

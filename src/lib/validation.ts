@@ -119,10 +119,17 @@ export const catalogItemSchema = z.object({
   categoryId: z.union([z.string().min(1), z.null()]).optional(),
   costPrice: moneyField.default(0),
   sellingPrice: moneyField,
+  // Diskon produk per unit (Rp) — wajib lebih kecil dari harga jual (barang
+  // gratis lewat fitur lain, bukan secara tidak sengaja lewat diskon = harga).
+  discountAmount: moneyField.default(0),
   stockQty: qtyField.default(0),
   minStockQty: qtyField.default(0),
   unit: z.string().trim().max(FIELD_LIMITS.unit, 'Satuan terlalu panjang').default('pcs'),
 })
+  .refine((v) => v.discountAmount < v.sellingPrice, {
+    message: 'Diskon harus lebih kecil dari harga jual',
+    path: ['discountAmount'],
+  })
 
 export const categorySchema = z.object({
   name: nameField,
@@ -157,6 +164,10 @@ export const checkoutSchema = z.object({
           .min(0.001, 'Jumlah minimal 0.001')
           .max(100_000, 'Jumlah terlalu besar')
           .refine((v) => Math.round(v * 1000) === v * 1000, 'Jumlah maksimal 3 desimal'),
+        // Diskon PER ITEM: persen (prioritas, server hitung ulang — anti price
+        // tampering) atau nominal Rp (dibatasi maksimal harga baris di server).
+        discountAmount: moneyField.default(0),
+        discountPercent: percentField.default(0),
       })
     )
     .min(1, 'Keranjang masih kosong')

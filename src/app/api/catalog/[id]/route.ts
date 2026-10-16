@@ -63,6 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           categoryId: body.categoryId ?? null,
           costPrice: body.costPrice,
           sellingPrice: body.sellingPrice,
+          discountAmount: body.discountAmount,
           ...(item.type === 'PRODUCT'
             ? { stockQty: body.stockQty, minStockQty: body.minStockQty, unit: body.unit }
             : { unit: body.unit }),

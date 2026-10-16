@@ -68,6 +68,7 @@ type ItemRow = {
   categoryId: string | null
   category?: { name: string } | null
   sellingPrice: number
+  discountAmount: number
   stockQty: number
   minStockQty: number
   unit: string
@@ -86,6 +87,7 @@ export function toCatalogItemDTO(row: ItemRow): CatalogItemDTO {
     categoryId: row.categoryId,
     categoryName: row.category?.name ?? null,
     sellingPrice: row.sellingPrice,
+    discountAmount: row.discountAmount ?? 0,
     stockQty: row.stockQty,
     minStockQty: row.minStockQty,
     unit: row.unit,
@@ -134,6 +136,8 @@ type TxItemRow = {
   quantity: number
   unitPrice: number
   subtotal: number
+  discountAmount?: number
+  discountPercent?: number
   refundedQty?: number
 }
 
@@ -147,6 +151,8 @@ export function toTransactionItemDTO(row: TxItemRow): TransactionItemDTO {
     quantity: row.quantity,
     unitPrice: row.unitPrice,
     subtotal: row.subtotal,
+    discountAmount: row.discountAmount ?? 0,
+    discountPercent: row.discountPercent ?? 0,
     refundedQty: row.refundedQty ?? 0,
   }
 }

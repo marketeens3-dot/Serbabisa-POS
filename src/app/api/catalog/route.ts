@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
           categoryId: body.categoryId ?? null,
           costPrice: body.costPrice,
           sellingPrice: body.sellingPrice,
+          discountAmount: body.discountAmount,
           stockQty: body.type === 'PRODUCT' ? body.stockQty : 0,
           minStockQty: body.type === 'PRODUCT' ? body.minStockQty : 0,
           unit: body.unit,

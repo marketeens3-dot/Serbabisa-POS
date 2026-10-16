@@ -33,6 +33,8 @@ export function PosSuccess({
   const effectiveConfig = config ?? DEFAULT_INVOICE_CONFIG
   const printInvoice = usePrintInvoice(effectiveConfig.paperSize)
   const [sendingWa, setSendingWa] = useState(false)
+  // Diskon per item (Σ diskon baris) — ditampilkan terpisah dari diskon transaksi.
+  const itemDiscountTotal = (transaction.items ?? []).reduce((s, i) => s + (i.discountAmount ?? 0), 0)
   const invoiceStore: InvoiceStore = {
     businessName: store.businessName,
     address: store.address,
@@ -80,10 +82,13 @@ export function PosSuccess({
           <dl className="mt-7 space-y-2.5 text-sm">
             <SummaryRow label="Metode pembayaran" value={METHOD_LABELS[transaction.paymentMethod] ?? transaction.paymentMethod} />
             <SummaryRow label="Total tagihan" value={formatIDR(transaction.totalAmount)} />
+            {itemDiscountTotal > 0 && <SummaryRow label="Diskon item" value={`- ${formatIDR(itemDiscountTotal)}`} />}
             <SummaryRow label="Dibayar" value={formatIDR(transaction.paidAmount)} />
             {transaction.discountAmount > 0 && (
               <SummaryRow
-                label={`Diskon${transaction.discountPercent > 0 ? ` (${formatPercentID(transaction.discountPercent)})` : ""}`}
+                label={`Diskon${itemDiscountTotal > 0 ? " toko" : ""}${
+                  transaction.discountPercent > 0 ? ` (${formatPercentID(transaction.discountPercent)})` : ""
+                }`}
                 value={`- ${formatIDR(transaction.discountAmount)}`}
               />
             )}

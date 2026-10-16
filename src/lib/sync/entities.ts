@@ -108,7 +108,7 @@ export const ENTITIES: readonly EntityDef[] = [
     tenantScoped: true,
     fields: [
       'id', 'tenantId', 'type', 'name', 'sku', 'barcode', 'description', 'categoryId',
-      'costPrice', 'sellingPrice', 'minStockQty', 'unit', 'isActive', 'createdAt', 'updatedAt',
+      'costPrice', 'sellingPrice', 'discountAmount', 'minStockQty', 'unit', 'isActive', 'createdAt', 'updatedAt',
       // stockQty IKUT disinkronkan, karena nilainya adalah hasil turunan dari
       // ledger (InventoryMovement) yang sudah lengkap titik awalnya.
       //
@@ -167,7 +167,7 @@ export const ENTITIES: readonly EntityDef[] = [
     parentField: 'transactionId',
     fields: [
       'id', 'transactionId', 'catalogItemId', 'itemType', 'itemNameSnapshot', 'skuSnapshot',
-      'quantity', 'unitPrice', 'subtotal', 'refundedQty', 'createdAt',
+      'quantity', 'unitPrice', 'subtotal', 'discountAmount', 'discountPercent', 'refundedQty', 'createdAt',
     ],
   },
   {

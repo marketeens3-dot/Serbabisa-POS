@@ -59,6 +59,8 @@ export type CatalogItemDTO = {
   categoryId: string | null
   categoryName?: string | null
   sellingPrice: number
+  /** Diskon per unit (Rp) — harga jadi = sellingPrice − discountAmount. */
+  discountAmount: number
   stockQty: number
   minStockQty: number
   unit: string
@@ -103,7 +105,12 @@ export type TransactionItemDTO = {
   skuSnapshot: string | null
   quantity: number
   unitPrice: number
+  /** NET baris: round(qty × unitPrice) − discountAmount. */
   subtotal: number
+  /** Diskon Rp untuk baris ini (0 = tanpa diskon item). */
+  discountAmount: number
+  /** Persen diskon baris (0 = nominal manual / tanpa diskon) — untuk nota. */
+  discountPercent: number
   refundedQty: number
 }
 

@@ -149,6 +149,8 @@ export async function POST(req: NextRequest) {
         quantity: number
         unitPrice: number
         subtotal: number
+        discountAmount: number
+        discountPercent: number
       }[] = []
 
       for (const input of body.items) {
@@ -178,7 +180,17 @@ export async function POST(req: NextRequest) {
 
         // HARGA SELALU dari database — harga dari browser diabaikan (anti price tampering).
         const unitPrice = item.sellingPrice
-        const subtotal = Math.round(quantity * unitPrice)
+        const gross = Math.round(quantity * unitPrice)
+        // DISKON PER ITEM: persen > 0 → nominal dihitung ulang dari harga database
+        // (input discountAmount client DIABAIKAN — anti price tampering, pola sama
+        // dengan diskon transaksi). Nominal Rp manual dibatasi maks harga baris —
+        // diskon per item tidak pernah bisa membuat baris bernilai negatif.
+        const itemDiscountPercent = input.discountPercent
+        const itemDiscountAmount =
+          itemDiscountPercent > 0
+            ? Math.floor((gross * itemDiscountPercent) / 100)
+            : Math.min(Math.max(0, Math.floor(input.discountAmount)), gross)
+        const lineSubtotal = gross - itemDiscountAmount
         lines.push({
           catalogItemId: item.id,
           itemType: item.type,
@@ -186,12 +198,17 @@ export async function POST(req: NextRequest) {
           skuSnapshot: item.sku,
           quantity,
           unitPrice,
-          subtotal,
+          subtotal: lineSubtotal,
+          discountAmount: itemDiscountAmount,
+          discountPercent: itemDiscountPercent,
         })
       }
 
       // ---------- HITUNG ULANG SERVER-SIDE ----------
+      // Subtotal transaksi = Σ subtotal item (NET — setelah diskon per item).
+      // Rumus total lama tetap berlaku: total = subtotal − diskonTransaksi + pajak.
       const subtotal = lines.reduce((s, l) => s + l.subtotal, 0)
+      const itemDiscountTotal = lines.reduce((s, l) => s + l.discountAmount, 0)
       // Diskon persen > 0 → diskon diterapkan ke SELURUH item; nominal SELALU
       // dihitung ulang dari harga database (anti price tampering, sama seperti unitPrice).
       // Diskon dibulatkan ke bawah (floor) — selisih pembulatan rupiah di tahan toko.
@@ -295,7 +312,7 @@ export async function POST(req: NextRequest) {
         action: AUDIT_ACTIONS.TRANSACTION_CREATED,
         resourceType: 'Transaction',
         resourceId: transaction.id,
-        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod, discountPercent, discountAmount },
+        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod, discountPercent, discountAmount, itemDiscountTotal },
         ipAddress: ip,
         userAgent: ua,
       })

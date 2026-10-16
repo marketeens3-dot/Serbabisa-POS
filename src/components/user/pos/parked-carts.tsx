@@ -48,6 +48,11 @@ export type ParkedCartLine = {
   unitPrice: number;
   unit: string;
   type: string;
+  /** Diskon per baris (opsional — parkiran lama tanpa field ini = tanpa diskon). */
+  discountMode?: "rp" | "pct";
+  discountValue?: number;
+  /** true = nominal diskon per unit dari master produk (ikut qty). */
+  discountFromProduct?: boolean;
 };
 
 export type ParkedCart = {

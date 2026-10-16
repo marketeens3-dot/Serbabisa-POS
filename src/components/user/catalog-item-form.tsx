@@ -28,6 +28,8 @@ const formSchema = z.object({
     .or(z.literal("")),
   categoryId: z.string().optional(),
   sellingPrice: z.coerce.number({ message: "Harga jual wajib diisi" }).int("Harga harus bilangan bulat rupiah").min(0, "Harga tidak boleh negatif").max(1_000_000_000, "Harga terlalu besar"),
+  // Diskon per unit (Rp): harga jadi = harga jual − diskon (cth: 9.500 − 2.500 = 7.000).
+  discountPrice: z.coerce.number().int("Harga harus bilangan bulat rupiah").min(0, "Diskon tidak boleh negatif").max(1_000_000_000, "Diskon terlalu besar").default(0),
   costPrice: z.coerce.number().int("Harga harus bilangan bulat rupiah").min(0, "Harga tidak boleh negatif").max(1_000_000_000).default(0),
   stockQty: z.coerce.number().min(0, "Stok tidak boleh negatif").max(100_000, "Stok terlalu besar").default(0),
   minStockQty: z.coerce.number().min(0, "Stok minimum tidak boleh negatif").max(100_000).default(0),
@@ -65,6 +67,7 @@ export function CatalogItemFormDialog({
       barcode: "",
       categoryId: undefined,
       sellingPrice: 0,
+      discountPrice: 0,
       costPrice: 0,
       stockQty: 0,
       minStockQty: 0,
@@ -83,6 +86,7 @@ export function CatalogItemFormDialog({
         barcode: item?.barcode ?? "",
         categoryId: item?.categoryId ?? undefined,
         sellingPrice: item?.sellingPrice ?? 0,
+        discountPrice: item?.discountAmount ?? 0,
         costPrice: 0,
         stockQty: item?.stockQty ?? 0,
         minStockQty: item?.minStockQty ?? 0,
@@ -104,6 +108,10 @@ export function CatalogItemFormDialog({
       return
     }
     const values = parsed.data
+    if (values.discountPrice >= values.sellingPrice && values.sellingPrice > 0) {
+      form.setError("discountPrice", { message: "Diskon harus lebih kecil dari harga jual" })
+      return
+    }
     setSaving(true)
     setError(null)
     const payload = {
@@ -113,6 +121,7 @@ export function CatalogItemFormDialog({
       barcode: values.barcode || null,
       categoryId: values.categoryId || null,
       sellingPrice: values.sellingPrice,
+      discountAmount: values.discountPrice,
       costPrice: values.costPrice,
       stockQty: isProduct ? values.stockQty : 0,
       minStockQty: isProduct ? values.minStockQty : 0,
@@ -232,12 +241,37 @@ export function CatalogItemFormDialog({
                   <FormItem>
                     <FormLabel>Harga jual (Rp) *</FormLabel>
                     <FormControl>
-                      <Input {...field} type="number" min={0} step={1} inputMode="numeric" placeholder="5000" className="tabular" />
+                      <Input {...field} type="number" min={0} step={1} inputMode="numeric" placeholder="9500" className="tabular" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="discountPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Diskon (Rp)</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" min={0} step={1} inputMode="numeric" placeholder="0" className="tabular" />
+                    </FormControl>
+                    <FormDescription>
+                      {(() => {
+                        const price = Number(form.watch("sellingPrice")) || 0
+                        const disc = Number(form.watch("discountPrice")) || 0
+                        if (disc <= 0) return "Tanpa diskon — harga normal di kasir."
+                        if (disc >= price && price > 0) return "Diskon melebihi harga jual."
+                        return `Harga jadi: Rp ${(price - disc).toLocaleString("id-ID")} / ${form.watch("unit") || "pcs"}`
+                      })()}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="unit"

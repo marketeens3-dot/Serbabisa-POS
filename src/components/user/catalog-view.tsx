@@ -206,7 +206,16 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                     {item.categoryName ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <MoneyCell amount={item.sellingPrice} className="font-semibold" />
+                    {item.discountAmount > 0 ? (
+                      <div className="flex flex-col items-end leading-tight">
+                        <MoneyCell amount={item.sellingPrice - item.discountAmount} className="font-semibold" />
+                        <span className="text-[11px] text-muted-foreground line-through tabular">
+                          {formatIDR(item.sellingPrice)}
+                        </span>
+                      </div>
+                    ) : (
+                      <MoneyCell amount={item.sellingPrice} className="font-semibold" />
+                    )}
                   </TableCell>
                   {isProduct && (
                     <TableCell className="text-right">

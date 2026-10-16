@@ -118,6 +118,9 @@ model CatalogItem {
   category     Category? @relation(fields: [categoryId], references: [id])
   costPrice    Int      @default(0)
   sellingPrice Int
+  // Diskon per unit (Rp) — harga jual efektif = sellingPrice − discountAmount.
+  // Otomatis jadi diskon baris di kasir (bisa dioverride per transaksi).
+  discountAmount Int    @default(0)
   stockQty     Float    @default(0)
   minStockQty  Float    @default(0)
   unit         String   @default("pcs")
@@ -215,7 +218,11 @@ model TransactionItem {
   skuSnapshot      String?
   quantity         Float
   unitPrice        Int
+  // subtotal = NET baris: round(qty × unitPrice) − discountAmount.
+  // Transaction.subtotal = Σ subtotal item → rumus total lama tetap berlaku.
   subtotal         Int
+  discountAmount   Int           @default(0) // diskon Rp untuk baris ini (maks = harga baris)
+  discountPercent  Float         @default(0) // persen diskon baris — utk tampilan nota (server hitung ulang)
   refundedQty      Float        @default(0) // kumulatif qty yang direfund per item
   createdAt        DateTime      @default(now())
 

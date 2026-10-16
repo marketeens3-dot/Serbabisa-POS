@@ -48,8 +48,10 @@ const SAMPLE_TX: TransactionDTO = {
   customerName: "Budi Santoso",
   customerPhone: "628123456789",
   items: [
-    { id: "1", catalogItemId: "a", itemType: "PRODUCT", itemNameSnapshot: "Oli Mesin 1L", skuSnapshot: "OLI-1L", quantity: 1, unitPrice: 65000, subtotal: 65000, refundedQty: 0 },
-    { id: "2", catalogItemId: "b", itemType: "SERVICE", itemNameSnapshot: "Jasa Ganti Oli", skuSnapshot: null, quantity: 1, unitPrice: 20000, subtotal: 20000, refundedQty: 0 },
+    // Contoh preview: satu item dengan diskon per item agar builder bisa
+    // mempratinjau tampilan baris "Diskon" di nota.
+    { id: "1", catalogItemId: "a", itemType: "PRODUCT", itemNameSnapshot: "Oli Mesin 1L", skuSnapshot: "OLI-1L", quantity: 1, unitPrice: 65000, subtotal: 58500, discountAmount: 6500, discountPercent: 10, refundedQty: 0 },
+    { id: "2", catalogItemId: "b", itemType: "SERVICE", itemNameSnapshot: "Jasa Ganti Oli", skuSnapshot: null, quantity: 1, unitPrice: 20000, subtotal: 20000, discountAmount: 0, discountPercent: 0, refundedQty: 0 },
   ],
 }
 

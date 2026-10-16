@@ -45,8 +45,10 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
   },
 }, {
   // Main process Electron & tooling build harus CommonJS (require/module.exports)
-  // agar bisa dipaket ke dalam app.asar tanpa transformasi.
-  files: ["electron/**/*.cjs", "scripts/**/*.cjs"],
+  // agar bisa dipaket ke dalam app.asar tanpa transformasi. Skrip utilitas di
+  // scripts/*.js (tes E2E, maintenance DB) juga CommonJS — dijalankan langsung
+  // dengan node, bukan bagian dari bundle aplikasi.
+  files: ["electron/**/*.cjs", "scripts/**/*.cjs", "scripts/**/*.js"],
   rules: {
     "@typescript-eslint/no-require-imports": "off",
     "@typescript-eslint/no-var-requires": "off",

@@ -27,6 +27,7 @@ export function CheckoutDialog({
   onOpenChange,
   cart,
   subtotal,
+  itemDiscountTotal = 0,
   discount,
   discountPercent = 0,
   submitting,
@@ -35,7 +36,11 @@ export function CheckoutDialog({
   open: boolean
   onOpenChange: (v: boolean) => void
   cart: CartLine[]
+  /** Bruto Σ baris (sebelum diskon per item). */
   subtotal: number
+  /** Σ diskon per item — tampil sebagai baris "Diskon item". */
+  itemDiscountTotal?: number
+  /** Diskon transaksi (Rp efektif) — dihitung dari subtotal NETO. */
   discount: number
   /** Persen diskon yang aktif (>0 = mode diskon persen seluruh item). */
   discountPercent?: number
@@ -48,7 +53,11 @@ export function CheckoutDialog({
   const [notes, setNotes] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  const total = useMemo(() => Math.max(0, subtotal - discount + taxAmount), [subtotal, discount, taxAmount])
+  // Rumus = server: total = subtotalBruto − diskonItem − diskonTransaksi + pajak.
+  const total = useMemo(
+    () => Math.max(0, subtotal - itemDiscountTotal - discount + taxAmount),
+    [subtotal, itemDiscountTotal, discount, taxAmount]
+  )
   const paid = Math.floor(Number(paidInput.replace(/[^0-9]/g, "")) || 0)
   const change = paid - total
   const isShort = paid < total
@@ -95,8 +104,11 @@ export function CheckoutDialog({
           </DialogTitle>
           <DialogDescription>
             {cart.length} item · Subtotal {formatIDR(subtotal)}
+            {itemDiscountTotal > 0 && ` · Diskon item ${formatIDR(itemDiscountTotal)}`}
             {discount > 0 &&
-              ` · Diskon${discountPercent > 0 ? ` ${formatPercentID(discountPercent)}` : ""} ${formatIDR(discount)}`}
+              ` · Diskon${itemDiscountTotal > 0 ? " transaksi" : ""}${
+                discountPercent > 0 ? ` ${formatPercentID(discountPercent)}` : ""
+              } ${formatIDR(discount)}`}
           </DialogDescription>
         </DialogHeader>
 

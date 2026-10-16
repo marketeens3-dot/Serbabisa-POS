@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronsUpDown, Minus, Plus, ShoppingCart, Trash2, UserPlus, X } from "lucide-react";
+import { Check, ChevronsUpDown, Minus, Plus, Pin, ShoppingCart, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,23 +18,28 @@ import { formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { ParkedCartsControls, type ParkedCart } from "@/components/user/pos/parked-carts";
 import { ParkedCartTip } from "@/components/user/pos/parked-cart-tip";
-import type { CartLine } from "@/components/user/pos/pos-view";
+import { lineDiscount, lineGross, effectiveUnitPrice, type CartLine } from "@/components/user/pos/cart-math";
 import type { CustomerDTO, Paginated } from "@/lib/types";
 
 export function CartPanel({
   cart,
   subtotal,
+  itemDiscountTotal,
   discount,
   discountMode,
   discountInput,
   setDiscountMode,
   setDiscountInput,
+  discountPinned,
+  onToggleDiscountPinned,
+  onClearDiscount,
   customerId,
   setCustomerId,
   customersVersion,
   onCustomersChanged,
   onSetQty,
   onRemove,
+  onSetLineDiscount,
   onCheckout,
   disabled,
   payLocked = false,
@@ -44,7 +49,10 @@ export function CartPanel({
   onDeleteParked,
 }: {
   cart: CartLine[]
+  /** Bruto Σ baris (sebelum diskon per item) — untuk baris Subtotal. */
   subtotal: number
+  /** Σ diskon per item (baris "Diskon item" di ringkasan). */
+  itemDiscountTotal: number
   /** Nominal diskon efektif (Rp) — hasil turunan mode+input (dihitung di pos-view). */
   discount: number
   /** "rp" = nominal manual; "pct" = persen diterapkan ke seluruh item. */
@@ -53,12 +61,19 @@ export function CartPanel({
   discountInput: number
   setDiscountMode: (v: "rp" | "pct") => void
   setDiscountInput: (v: number) => void
+  /** Pin "Tetap": diskon otomatis dipakai lagi di transaksi berikutnya. */
+  discountPinned: boolean
+  onToggleDiscountPinned: () => void
+  /** "Hapus" diskon transaksi (sekalian melepas pin bila aktif). */
+  onClearDiscount: () => void
   customerId: string | null
   setCustomerId: (v: string | null) => void
   customersVersion: number
   onCustomersChanged: () => void
   onSetQty: (itemId: string, qty: number) => void
   onRemove: (itemId: string) => void
+  /** Set diskon per baris: mode + nilai (0 = hapus diskon baris). */
+  onSetLineDiscount: (itemId: string, mode: "rp" | "pct", value: number) => void
   onCheckout: () => void
   disabled: boolean
   /** Toko mewajibkan shift aktif & belum ada shift — tombol Bayar terkunci (UX layer). */
@@ -80,7 +95,10 @@ export function CartPanel({
 
   const customers = customersData?.data ?? []
   const selectedCustomer = customers.find((c) => c.id === customerId) ?? null
-  const total = Math.max(0, subtotal - discount)
+  // Neto = bruto − diskon per item. Diskon transaksi dihitung dari NETO ini —
+  // rumus sama dengan server (floor pada mode %).
+  const netSubtotal = subtotal - itemDiscountTotal
+  const total = Math.max(0, netSubtotal - discount)
 
   return (
     <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg shadow-primary/5 flex flex-col max-h-[calc(100vh-6.5rem)]">
@@ -123,7 +141,8 @@ export function CartPanel({
         ) : (
           <ul className="divide-y divide-border/60">
             {cart.map((line) => {
-              const lineSubtotal = Math.round(line.quantity * line.item.sellingPrice)
+              const gross = lineGross(line)
+              const disc = lineDiscount(line)
               return (
                 /* Baris 2 tingkat: nama + hapus di atas, stepper + subtotal di
                    bawah. Layout satu-baris lama menyisakan ~52px untuk nama di
@@ -142,7 +161,19 @@ export function CartPanel({
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground tabular mt-0.5">
-                    {formatIDR(line.item.sellingPrice)} / {line.item.unit}
+                    {line.discountFromProduct && line.discountValue > 0 ? (
+                      <>
+                        <span className="line-through">{formatIDR(line.item.sellingPrice)}</span>{" "}
+                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                          {formatIDR(effectiveUnitPrice(line))}
+                        </span>{" "}
+                        / {line.item.unit}
+                      </>
+                    ) : (
+                      <>
+                        {formatIDR(line.item.sellingPrice)} / {line.item.unit}
+                      </>
+                    )}
                     {line.item.type === "PRODUCT" && ` · stok ${formatQty(line.item.stockQty)}`}
                   </p>
                   <div className="flex items-center justify-between gap-2 mt-2">
@@ -171,8 +202,17 @@ export function CartPanel({
                         <Plus className="size-4" />
                       </button>
                     </div>
-                    <p className="text-sm font-semibold tabular">{formatIDR(lineSubtotal)}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* Chip DISKON PER PRODUK — buka popover input % / Rp. */}
+                      <LineDiscountPopover line={line} onApply={onSetLineDiscount} />
+                      <p className="text-sm font-semibold tabular shrink-0">{formatIDR(gross - disc)}</p>
+                    </div>
                   </div>
+                  {disc > 0 && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 tabular mt-1 text-right">
+                      Diskon{line.discountMode === "pct" ? ` ${formatPercentID(line.discountValue)}` : ""} − {formatIDR(disc)} dari {formatIDR(gross)}
+                    </p>
+                  )}
                 </li>
               )
             })}
@@ -247,7 +287,7 @@ export function CartPanel({
           </Popover>
         </div>
 
-        {/* Diskon — toggle Rp (nominal) / % (seluruh item) */}
+        {/* Diskon — toggle Rp (nominal) / % (seluruh item) + pin "Tetap" */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
@@ -278,10 +318,32 @@ export function CartPanel({
                   </button>
                 ))}
               </div>
+              {/* Tombol DISKON TETAP: sematkan nilai diskon agar otomatis
+                  terpakai lagi di transaksi berikutnya (tersimpan per kasir). */}
+              <button
+                type="button"
+                onClick={onToggleDiscountPinned}
+                aria-pressed={discountPinned}
+                aria-label="Diskon tetap"
+                title={
+                  discountPinned
+                    ? "Diskon tetap AKTIF — nilai ini otomatis dipakai lagi untuk transaksi berikutnya. Klik untuk melepas."
+                    : "Sematkan diskon — nilai ini otomatis dipakai lagi untuk transaksi berikutnya (tanpa input ulang)."
+                }
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                  discountPinned
+                    ? "border-amber-500/50 bg-amber-100 text-amber-900 shadow-sm dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-300"
+                    : "border-border/70 bg-muted/40 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Pin className={cn("size-3", discountPinned && "fill-current")} aria-hidden="true" />
+                Tetap
+              </button>
             </div>
             {discount > 0 && (
               <button
-                onClick={() => setDiscountInput(0)}
+                onClick={onClearDiscount}
                 className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"
                 aria-label="Hapus diskon"
               >
@@ -295,7 +357,7 @@ export function CartPanel({
               inputMode={discountMode === "pct" ? "decimal" : "numeric"}
               step={discountMode === "pct" ? "0.01" : "1"}
               min={0}
-              max={discountMode === "pct" ? 100 : subtotal}
+              max={discountMode === "pct" ? 100 : netSubtotal}
               value={discountInput || ""}
               placeholder="0"
               onChange={(e) => {
@@ -303,7 +365,7 @@ export function CartPanel({
                 const v =
                   discountMode === "pct"
                     ? Math.max(0, Math.min(100, Math.round(raw * 100) / 100))
-                    : Math.max(0, Math.min(subtotal, Math.floor(raw)))
+                    : Math.max(0, Math.min(netSubtotal, Math.floor(raw)))
                 setDiscountInput(v)
               }}
               className="h-9 tabular pr-10"
@@ -324,7 +386,13 @@ export function CartPanel({
               )}
             </p>
           ) : (
-            discount > subtotal && <p className="text-xs text-destructive">Diskon tidak boleh melebihi subtotal.</p>
+            discount > netSubtotal && <p className="text-xs text-destructive">Diskon tidak boleh melebihi subtotal.</p>
+          )}
+          {discountPinned && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 inline-flex items-center gap-1" role="status">
+              <Pin className="size-3 fill-current" aria-hidden="true" />
+              Diskon tetap — otomatis dipakai lagi untuk transaksi berikutnya.
+            </p>
           )}
         </div>
 
@@ -334,8 +402,17 @@ export function CartPanel({
             <span>Subtotal</span>
             <span className="tabular font-medium text-foreground">{formatIDR(subtotal)}</span>
           </div>
+          {itemDiscountTotal > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Diskon item</span>
+              <span className="tabular font-medium text-amber-700 dark:text-amber-400">- {formatIDR(itemDiscountTotal)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-muted-foreground">
-            <span>Diskon{discountMode === "pct" && discountInput > 0 ? ` (${formatPercentID(discountInput)})` : ""}</span>
+            <span>
+              Diskon{itemDiscountTotal > 0 ? " transaksi" : ""}
+              {discountMode === "pct" && discountInput > 0 ? ` (${formatPercentID(discountInput)})` : ""}
+            </span>
             <span className="tabular font-medium text-foreground">- {formatIDR(discount)}</span>
           </div>
           <div className="flex justify-between items-center pt-2 border-t">
@@ -347,7 +424,7 @@ export function CartPanel({
         <Button
           size="lg"
           className="w-full h-12 text-base font-bold shadow-sm active:scale-[0.98]"
-          disabled={disabled || discount > subtotal || payLocked}
+          disabled={disabled || discount > netSubtotal || payLocked}
           onClick={onCheckout}
           title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
           aria-describedby={payLocked ? "pay-locked-hint" : undefined}
@@ -375,6 +452,149 @@ export function CartPanel({
         }}
       />
     </div>
+  )
+}
+
+/* Chip diskon PER PRODUK pada tiap baris keranjang: popover input % / Rp.
+   Nilai di-clamp sama seperti server: % 0–100 (2 desimal), Rp maks harga baris. */
+function LineDiscountPopover({
+  line,
+  onApply,
+}: {
+  line: CartLine
+  onApply: (itemId: string, mode: "rp" | "pct", value: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<"rp" | "pct">(line.discountMode)
+  const [value, setValue] = useState(line.discountValue)
+  const gross = lineGross(line)
+  const active = lineDiscount(line) > 0
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      if (line.discountFromProduct && line.discountMode === "rp") {
+        // Diskon produk = nominal per unit × qty. Saat diedit lewat chip,
+        // mulai dari TOTAL efektif baris — simpan = jadi override manual.
+        setMode("rp")
+        setValue(lineDiscount(line))
+      } else {
+        // Mulai mengedit dari nilai baris saat ini.
+        setMode(line.discountMode)
+        setValue(line.discountValue)
+      }
+    }
+    setOpen(next)
+  }
+
+  const preview =
+    mode === "pct" ? Math.floor((gross * value) / 100) : Math.min(Math.floor(value), gross)
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Diskon untuk ${line.item.name}`}
+          title="Beri diskon khusus untuk item ini"
+          className={cn(
+            "inline-flex h-8 max-w-28 items-center gap-1 rounded-md border px-2 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+            active
+              ? "border-amber-500/50 bg-amber-100 text-amber-900 dark:border-amber-400/40 dark:bg-amber-400/15 dark:text-amber-300"
+              : "border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+          )}
+        >
+          <Tag className="size-3 shrink-0" aria-hidden="true" />
+          {active
+            ? line.discountMode === "pct"
+              ? formatPercentID(line.discountValue)
+              : `−${formatIDR(lineDiscount(line)).replace("Rp ", "")}`
+            : "Diskon"}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="end">
+        <p className="text-xs font-semibold mb-2 truncate">Diskon — {line.item.name}</p>
+        {line.discountFromProduct && line.discountMode === "rp" && line.discountValue > 0 && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400 mb-2">
+            Mengikuti diskon produk: {formatIDR(Math.min(line.discountValue, line.item.sellingPrice))}/unit. Ubah nilai lalu
+            Terapkan untuk override manual.
+          </p>
+        )}
+        <div className="flex items-center gap-1.5">
+          <div
+            role="group"
+            aria-label="Satuan diskon item"
+            className="inline-flex shrink-0 rounded-md border border-border/70 p-0.5 bg-muted/40"
+          >
+            {(["rp", "pct"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  // Ganti mode: nolkan nilai agar tidak ada angka nyasar antar satuan.
+                  setMode(m)
+                  setValue(0)
+                }}
+                aria-pressed={mode === m}
+                className={cn(
+                  "rounded px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                  mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {m === "rp" ? "Rp" : "%"}
+              </button>
+            ))}
+          </div>
+          <Input
+            type="number"
+            min={0}
+            max={mode === "pct" ? 100 : gross}
+            step={mode === "pct" ? "0.01" : "1"}
+            value={value || ""}
+            placeholder="0"
+            onChange={(e) => {
+              const raw = Number(e.target.value) || 0
+              setValue(
+                mode === "pct"
+                  ? Math.max(0, Math.min(100, Math.round(raw * 100) / 100))
+                  : Math.max(0, Math.min(gross, Math.floor(raw)))
+              )
+            }}
+            className="h-8 tabular"
+            aria-label="Nilai diskon item"
+          />
+          <span className="text-xs text-muted-foreground shrink-0 tabular">{mode === "pct" ? "%" : "Rp"}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Diskon</span>
+          <span className="font-semibold tabular text-amber-700 dark:text-amber-400">− {formatIDR(preview)}</span>
+        </div>
+        <div className="mt-3 flex gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 flex-1"
+            onClick={() => {
+              onApply(line.item.id, "rp", 0)
+              setOpen(false)
+            }}
+          >
+            Hapus
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 flex-1"
+            onClick={() => {
+              onApply(line.item.id, mode, value)
+              setOpen(false)
+            }}
+          >
+            Terapkan
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
