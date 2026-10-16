@@ -65,6 +65,8 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "next-env.d.ts",
     "examples/**",
     "skills",
+    // Backup scaffold platform (bukan bagian dari aplikasi)
+    ".scaffold-backup/**",
   ],
 }];
 

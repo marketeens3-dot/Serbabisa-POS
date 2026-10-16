@@ -1,5 +1,6 @@
 // Verifikasi end-to-end Serbabisa POS via Playwright
 // Golden path: buka / → render login → login kasir → POS view dengan data Supabase
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { chromium } = require("playwright");
 
 (async () => {
