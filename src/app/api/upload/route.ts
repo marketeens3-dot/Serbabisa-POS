@@ -1,7 +1,9 @@
 // POST /api/upload — upload logo toko (multipart). Validasi berlapis:
-//   magic bytes (bukan sekadar extension) via sharp, maksimal 300KB,
-//   hanya PNG/JPG/WEBP, di-resize + re-encode ke WebP (strip metadata/EXIF), disimpan sebagai
-//   data URL di database (stateless, tidak menulis filesystem server).
+//   magic bytes (bukan sekadar extension) via sharp, input hingga 10MB lalu DIKECILKAN
+//   (resize 512x512 + re-encode WebP/PNG, strip metadata/EXIF) sampai hasil <= 300KB,
+//   hanya PNG/JPG/WEBP, disimpan sebagai data URL di database (stateless, tidak menulis
+//   filesystem server). Batas 300KB berlaku pada HASIL KOMPRESI, bukan file asli —
+//   file asli > 300KB justru yang paling membutuhkan diproses.
 //
 // Kenapa WebP: logo ikut setiap payload tenant (login, sync, bootstrap HP) dan
 // menempati kuota DB Supabase free (500 MB). WebP lossless ~25-40% lebih kecil
@@ -12,7 +14,7 @@ import sharp from 'sharp'
 import { db } from '@/lib/db'
 import { ApiError, assertSameOrigin, getClientIp, getUserAgent, handleApiError, requireUser } from '@/lib/api'
 import { logAudit } from '@/lib/audit'
-import { AUDIT_ACTIONS, MAX_LOGO_BYTES } from '@/lib/constants'
+import { AUDIT_ACTIONS, MAX_LOGO_BYTES, MAX_LOGO_UPLOAD_BYTES } from '@/lib/constants'
 
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
@@ -24,8 +26,9 @@ export async function POST(req: NextRequest) {
     const form = await req.formData()
     const file = form.get('file')
     if (!(file instanceof File)) throw new ApiError('INVALID_INPUT', 'File logo wajib dipilih.', 422)
-    if (file.size > MAX_LOGO_BYTES) {
-      throw new ApiError('FILE_TOO_LARGE', 'Ukuran logo maksimal 300KB.', 413)
+    // Batas input longgar (10MB): kompresi sharp di bawah yang mengecilkan.
+    if (file.size > MAX_LOGO_UPLOAD_BYTES) {
+      throw new ApiError('FILE_TOO_LARGE', 'Ukuran logo maksimal 10MB. File akan dikompres otomatis setelah diunggah.', 413)
     }
     if (file.type && !ALLOWED_MIME.has(file.type)) {
       throw new ApiError('INVALID_FILE_TYPE', 'Logo hanya boleh PNG, JPG, atau WEBP.', 415)
@@ -48,24 +51,38 @@ export async function POST(req: NextRequest) {
     // perilaku lama (PNG-9). Konsumen (img HTML, validasi DATA_URL_IMAGE, sync, HP)
     // sudah menerima image/webp maupun image/png.
     const useLossless = meta.format === 'png'
-    const resized = pipeline.resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-    const [webpOut, pngOut] = await Promise.all([
-      resized.clone().webp(useLossless ? { lossless: true, effort: 5 } : { quality: 82, effort: 5 }).toBuffer(),
-      resized.clone().png({ compressionLevel: 9 }).toBuffer(),
-    ])
-    const preferWebp = webpOut.length <= pngOut.length
-    const output = preferWebp ? webpOut : pngOut
+    const encode = async (size: number, quality: number) => {
+      const resized = pipeline.resize(size, size, { fit: 'inside', withoutEnlargement: true })
+      const [webpOut, pngOut] = await Promise.all([
+        resized.clone().webp(useLossless && quality >= 82 ? { lossless: true, effort: 5 } : { quality, effort: 5 }).toBuffer(),
+        resized.clone().png({ compressionLevel: 9, palette: quality < 82 }).toBuffer(),
+      ])
+      const preferWebp = webpOut.length <= pngOut.length
+      return { buffer: preferWebp ? webpOut : pngOut, isWebp: preferWebp }
+    }
+
+    // Pass pertama: kualitas terbaik (512px, q82/lossless).
+    let result = await encode(512, 82)
+    // Fallback bertingkat bila hasil tetap > 300KB (sangat jarang, mis. gambar berisik/full-detail):
+    // perkecil dimensi + turunkan kualitas sampai muat kuota.
+    const FALLBACKS: Array<[number, number]> = [[384, 70], [256, 60], [192, 50]]
+    for (const [size, quality] of FALLBACKS) {
+      if (result.buffer.length <= MAX_LOGO_BYTES) break
+      result = await encode(size, quality)
+    }
+    const output = result.buffer
+    const isWebp = result.isWebp
     if (output.length > MAX_LOGO_BYTES) {
       throw new ApiError('FILE_TOO_LARGE', 'Logo terlalu besar setelah diproses. Gunakan gambar lebih sederhana.', 413)
     }
-    const dataUrl = `data:image/${preferWebp ? 'webp' : 'png'};base64,${output.toString('base64')}`
+    const dataUrl = `data:image/${isWebp ? 'webp' : 'png'};base64,${output.toString('base64')}`
 
     await db.$transaction(async (tx) => {
       await tx.tenant.update({ where: { id: tenantId }, data: { logoUrl: dataUrl } })
       await logAudit(tx, {
         actorUserId: user.id, tenantId, action: AUDIT_ACTIONS.STORE_LOGO_UPDATED,
         resourceType: 'Tenant', resourceId: tenantId,
-        metadata: { bytes: output.length, width: meta.width, height: meta.height, originalFormat: meta.format, outputFormat: preferWebp ? 'webp' : 'png', outputLossless: preferWebp ? useLossless : true },
+        metadata: { bytes: output.length, width: meta.width, height: meta.height, originalFormat: meta.format, outputFormat: isWebp ? 'webp' : 'png', outputLossless: isWebp ? useLossless : true, originalBytes: file.size },
         ipAddress: getClientIp(req), userAgent: getUserAgent(req),
       })
     })

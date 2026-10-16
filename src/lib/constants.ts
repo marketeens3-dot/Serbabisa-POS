@@ -135,4 +135,8 @@ export const FIELD_LIMITS = {
 } as const
 
 export const MAX_TRANSACTION_ITEMS = 200
+// Batas logo SETELAH diproses sharp (disimpan sbg data URL di DB — jaga kuota Supabase free).
 export const MAX_LOGO_BYTES = 300 * 1024
+// Batas file logo YANG DIUNGGAH user (SEBELUM kompresi). Foto HP/logo desain umumnya 1-8MB;
+// sharp akan resize 512x512 + re-encode WebP sehingga output selalu jauh di bawah MAX_LOGO_BYTES.
+export const MAX_LOGO_UPLOAD_BYTES = 10 * 1024 * 1024

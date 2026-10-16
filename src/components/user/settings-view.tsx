@@ -214,7 +214,7 @@ export default function SettingsView() {
                   </div>
                   <div className="space-y-2 min-w-0">
                     <p className="text-sm font-medium">Logo toko</p>
-                    <p className="text-xs text-muted-foreground">PNG/JPG/WEBP, maks 300KB — otomatis diperkecil &amp; dinormalisasi.</p>
+                    <p className="text-xs text-muted-foreground">PNG/JPG/WEBP hingga 10MB — otomatis dikecilkan &amp; dikompres ke WebP (hasil ≤ 300KB).</p>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                         {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
