@@ -6,7 +6,7 @@
   "author": "Serbabisa",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "bash scripts/with-env.sh next dev -p 3000",
     "dev:win": "next dev -p 3000 --webpack",
     "build": "next build",
     "start": "next start -p 3000",
@@ -14,7 +14,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file=.env scripts/db-check.ts",
-    "db:push": "prisma db push",
+    "db:push": "bash scripts/with-env.sh prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
