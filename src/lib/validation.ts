@@ -24,13 +24,16 @@ const nameField = z
   .min(2, 'Nama minimal 2 karakter')
   .max(FIELD_LIMITS.name, 'Nama terlalu panjang')
 
-// Telepon: kosong → null; terisi → harus valid lalu dinormalisasi (628xxx).
+// Telepon: tidak dikirim → undefined (JANGAN sentuh data lama); eksplisit null/'' → null (hapus);
+// terisi → validasi lalu dinormalisasi (628xxx).
+// PENTING: transform TIDAK BOLEH mengembalikan null untuk input yang absen — guard
+// `!== undefined` di route memakai undefined untuk membedakan "tidak dikirim" vs "hapus".
+// (Bug lama: .optional().transform(→null) membuat setiap PATCH parsial menghapus data.)
 const phoneField = z
   .union([z.string().trim().max(FIELD_LIMITS.phone, 'Nomor HP terlalu panjang'), z.null()])
   .optional()
-  .transform((v) => (v == null || v === '' ? null : v))
-  .refine((v) => v === null || normalizeIndonesianPhone(v) !== null, 'Nomor HP tidak valid')
-  .transform((v) => (v ? normalizeIndonesianPhone(v) : null))
+  .refine((v) => v === undefined || v === null || v === '' || normalizeIndonesianPhone(v) !== null, 'Nomor HP tidak valid')
+  .transform((v) => (v === undefined ? undefined : v === '' || v === null ? null : normalizeIndonesianPhone(v)))
 
 const moneyField = z
   .number({ message: 'Nilai harus berupa angka' })
@@ -128,9 +131,8 @@ export const customerSchema = z.object({
   email: z
     .union([z.string().trim().max(FIELD_LIMITS.email), z.null()])
     .optional()
-    .transform((v) => (v == null || v === '' ? null : v))
-    .refine((v) => v === null || EMAIL_REGEX.test(v), 'Email tidak valid')
-    .transform((v) => (v ? v.toLowerCase() : null)),
+    .refine((v) => v === undefined || v === null || v === '' || EMAIL_REGEX.test(v), 'Email tidak valid')
+    .transform((v) => (v === undefined ? undefined : v === '' || v === null ? null : v.toLowerCase())),
   address: z.string().trim().max(FIELD_LIMITS.address, 'Alamat terlalu panjang').nullish(),
   notes: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
 })

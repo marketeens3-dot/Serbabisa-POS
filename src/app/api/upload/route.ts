@@ -1,7 +1,12 @@
 // POST /api/upload — upload logo toko (multipart). Validasi berlapis:
 //   magic bytes (bukan sekadar extension) via sharp, maksimal 300KB,
-//   hanya PNG/JPG/WEBP, di-resize + re-encode (strip metadata/EXIF), disimpan sebagai
+//   hanya PNG/JPG/WEBP, di-resize + re-encode ke WebP (strip metadata/EXIF), disimpan sebagai
 //   data URL di database (stateless, tidak menulis filesystem server).
+//
+// Kenapa WebP: logo ikut setiap payload tenant (login, sync, bootstrap HP) dan
+// menempati kuota DB Supabase free (500 MB). WebP lossless ~25-40% lebih kecil
+// dari PNG level-9, WebP lossy q82 dari JPEG biasanya ~60-75% lebih kecil.
+// PNG input memakai lossless supaya teks/transparansi logo tetap tajam.
 import { NextRequest, NextResponse } from 'next/server'
 import sharp from 'sharp'
 import { db } from '@/lib/db'
@@ -35,19 +40,32 @@ export async function POST(req: NextRequest) {
     if (!meta.format || !['png', 'jpeg', 'webp'].includes(meta.format)) {
       throw new ApiError('INVALID_FILE_TYPE', 'Format gambar tidak didukung.', 415)
     }
-    // Resize (maks 512×512, tanpa pembesaran) + re-encode PNG → strip metadata & seragamkan.
-    const output = await pipeline.resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer()
+    // Resize (maks 512×512, tanpa pembesaran) + re-encode → strip metadata & seragamkan.
+    // Target utama WebP: PNG (logo: teks + transparansi) memakai lossless agar tajam,
+    // JPEG/WEBP foto memakai lossy q82. Sebagai jaminan kuota, PNG level-9 juga di-
+    // encode lalu dipilih hasil yang LEBIH KECIL — untuk logo flat sederhana WebP
+    // lossless kadang sedikit lebih besar, dan fallback itu tetap ≥ hemat seperti
+    // perilaku lama (PNG-9). Konsumen (img HTML, validasi DATA_URL_IMAGE, sync, HP)
+    // sudah menerima image/webp maupun image/png.
+    const useLossless = meta.format === 'png'
+    const resized = pipeline.resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+    const [webpOut, pngOut] = await Promise.all([
+      resized.clone().webp(useLossless ? { lossless: true, effort: 5 } : { quality: 82, effort: 5 }).toBuffer(),
+      resized.clone().png({ compressionLevel: 9 }).toBuffer(),
+    ])
+    const preferWebp = webpOut.length <= pngOut.length
+    const output = preferWebp ? webpOut : pngOut
     if (output.length > MAX_LOGO_BYTES) {
       throw new ApiError('FILE_TOO_LARGE', 'Logo terlalu besar setelah diproses. Gunakan gambar lebih sederhana.', 413)
     }
-    const dataUrl = `data:image/png;base64,${output.toString('base64')}`
+    const dataUrl = `data:image/${preferWebp ? 'webp' : 'png'};base64,${output.toString('base64')}`
 
     await db.$transaction(async (tx) => {
       await tx.tenant.update({ where: { id: tenantId }, data: { logoUrl: dataUrl } })
       await logAudit(tx, {
         actorUserId: user.id, tenantId, action: AUDIT_ACTIONS.STORE_LOGO_UPDATED,
         resourceType: 'Tenant', resourceId: tenantId,
-        metadata: { bytes: output.length, width: meta.width, height: meta.height, originalFormat: meta.format },
+        metadata: { bytes: output.length, width: meta.width, height: meta.height, originalFormat: meta.format, outputFormat: preferWebp ? 'webp' : 'png', outputLossless: preferWebp ? useLossless : true },
         ipAddress: getClientIp(req), userAgent: getUserAgent(req),
       })
     })

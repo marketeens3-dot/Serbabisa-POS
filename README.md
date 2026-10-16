@@ -237,7 +237,7 @@ konkurensi SQLite dalam satu perintah.
 | `/api/catalog`, `/api/catalog/[id]` | GET/POST, PATCH | SKU/barcode unik per tenant; soft delete + mutasi ADJUSTMENT |
 | `/api/categories`, `/api/customers` (+ `[id]`) | GET/POST, PATCH | phone ternormalisasi 62xxx |
 | `/api/invoice-templates` (+ `[id]`) | GET/POST, PATCH/DELETE | config tervalidasi Zod (58mm/80mm/A4) |
-| `/api/settings`, `/api/profile`, `/api/upload` | GET/PATCH, PATCH, POST | upload: sharp magic-bytes, resize 512, re-encode PNG, ≤300KB |
+| `/api/settings`, `/api/profile`, `/api/upload` | GET/PATCH, PATCH, POST | upload: sharp magic-bytes, resize 512, re-encode WebP (lossless utk PNG, q82 utk JPEG; fallback PNG bila lebih kecil), ≤300KB |
 | `/api/whatsapp` | POST | deep-link wa.me + template token — BUKAN kirim otomatis |
 | `/api/export`, `/api/reports`, `/api/dashboard` | GET | CSV/Excel/PDF (BOM UTF-8, ≤10.000 baris, tenant-scoped); agregat & tren |
 | `/api/admin/dashboard|users|tenants|audit|settings` | GET/POST/PATCH | SUPER_ADMIN only; create user → password sementara tampil sekali |
