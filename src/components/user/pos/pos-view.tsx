@@ -465,11 +465,12 @@ export default function PosView() {
       onPark={() => setParkDialogOpen(true)}
       onResumeParked={handleRequestResume}
       onDeleteParked={(pc) => setDeleteTarget(pc)}
+      mobileSheet={isBelowLg}
     />
   )
 
   return (
-    <div className="max-w-[1600px] mx-auto max-lg:pb-40">
+    <div className="max-w-[1600px] mx-auto max-lg:pb-52">
       {/* ---------- Header mobile ala referensi: brand + sapaan + notifikasi ---------- */}
       <header className="lg:hidden mb-4">
         <div className="flex items-center gap-2.5">
@@ -545,7 +546,14 @@ export default function PosView() {
                 Satu instance saja — dipilih lewat breakpoint hook, nol fetch ganda. */}
             {isBelowLg ? (
               createPortal(
-                <div className="fixed inset-x-3 bottom-[8.5rem] z-30 no-print">{cartPanel}</div>,
+                // bottom tepat di atas bar Menu/Bayar (4.4rem + 48px + safe-area):
+                // tanpa celah, agar konten katalog tidak "terselip" di antara
+                // sheet dan bar.
+                <div
+                  className="fixed inset-x-3 z-30 no-print bottom-[calc(7.4rem+env(safe-area-inset-bottom))]"
+                >
+                  {cartPanel}
+                </div>,
                 document.body
               )
             ) : (
@@ -594,7 +602,7 @@ export default function PosView() {
         createPortal(
           <div
             key={addedFlash.n}
-            className="fixed bottom-[8.25rem] lg:bottom-8 left-1/2 -translate-x-1/2 z-40 pointer-events-none no-print"
+            className="fixed top-[4.75rem] left-1/2 -translate-x-1/2 lg:top-auto lg:bottom-8 z-40 pointer-events-none no-print"
             role="status"
             aria-live="polite"
           >
