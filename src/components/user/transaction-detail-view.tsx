@@ -288,6 +288,7 @@ export default function TransactionDetailView({ transactionId }: { transactionId
                         src={user.tenant.logoUrl}
                         alt={`Logo ${user.tenant.businessName}`}
                         className="size-10 rounded-lg border bg-muted/40 object-contain shrink-0"
+                        decoding="async"
                       />
                     ) : (
                       <span

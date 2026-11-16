@@ -3,13 +3,37 @@
 
 export const JAKARTA_TZ = 'Asia/Jakarta'
 
+// Cache formatter Intl — konstruktor Intl (NumberFormat/DateTimeFormat) mahal,
+// sedangkan formatIDR & kawan-kawan dipanggil di ratusan sel tabel / kartu setiap
+// render. Options tiap titik panggil statis, jadi formatter dibuat sekali (lazy)
+// lalu dipakai ulang — hemat CPU di perangkat kasir kelas bawah.
+const FMT_CACHE = new Map<string, Intl.NumberFormat | Intl.DateTimeFormat>()
+
+function numFmt(key: string, opts?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  let f = FMT_CACHE.get(key) as Intl.NumberFormat | undefined
+  if (!f) {
+    f = new Intl.NumberFormat('id-ID', opts)
+    FMT_CACHE.set(key, f)
+  }
+  return f
+}
+
+function dtFmt(locale: string, key: string, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  let f = FMT_CACHE.get(key) as Intl.DateTimeFormat | undefined
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, opts)
+    FMT_CACHE.set(key, f)
+  }
+  return f
+}
+
 export function formatIDR(amount: number): string {
   if (!Number.isFinite(amount)) return 'Rp 0'
-  return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(amount))
+  return 'Rp ' + numFmt('idr').format(Math.round(amount))
 }
 
 export function formatNumberID(amount: number): string {
-  return new Intl.NumberFormat('id-ID').format(amount)
+  return numFmt('num').format(amount)
 }
 
 /** Persen diskon utk nota/label: 10 → "10%", 12.5 → "12,5%" (tanpa nol desimal tak perlu). */
@@ -24,7 +48,7 @@ function toDate(date: Date | string | number): Date {
 }
 
 export function formatDateID(date: Date | string | number): string {
-  return new Intl.DateTimeFormat('id-ID', {
+  return dtFmt('id-ID', 'date', {
     timeZone: JAKARTA_TZ,
     day: '2-digit',
     month: '2-digit',
@@ -33,7 +57,7 @@ export function formatDateID(date: Date | string | number): string {
 }
 
 export function formatTimeID(date: Date | string | number): string {
-  return new Intl.DateTimeFormat('id-ID', {
+  return dtFmt('id-ID', 'time', {
     timeZone: JAKARTA_TZ,
     hour: '2-digit',
     minute: '2-digit',
@@ -47,13 +71,13 @@ export function formatDateTimeID(date: Date | string | number): string {
 
 export function formatQty(qty: number): string {
   const rounded = Math.round(qty * 1000) / 1000
-  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 3 }).format(rounded)
+  return numFmt('qty', { maximumFractionDigits: 3 }).format(rounded)
 }
 
 // Rentang "hari ini" menurut Asia/Jakarta (WIB, UTC+7, tanpa DST) — dikembalikan sebagai UTC Date
 // agar query database konsisten terlepas dari timezone server.
 export function jakartaDayRange(now: Date = new Date()): { startUtc: Date; endUtc: Date; ymd: string } {
-  const ymd = new Intl.DateTimeFormat('en-CA', {
+  const ymd = dtFmt('en-CA', 'ymd', {
     timeZone: JAKARTA_TZ,
     year: 'numeric',
     month: '2-digit',
@@ -68,7 +92,7 @@ export function jakartaDayRange(now: Date = new Date()): { startUtc: Date; endUt
 
 export function jakartaYear(now: Date = new Date()): number {
   return Number(
-    new Intl.DateTimeFormat('en-CA', { timeZone: JAKARTA_TZ, year: 'numeric' }).format(now)
+    dtFmt('en-CA', 'year', { timeZone: JAKARTA_TZ, year: 'numeric' }).format(now)
   )
 }
 
@@ -80,14 +104,14 @@ export function lastNDayRanges(n: number, now: Date = new Date()): { ymd: string
     const day = new Date(`${todayYmd}T12:00:00+07:00`) // tengah hari WIB agar aman dari offset aritmetika
     day.setUTCDate(day.getUTCDate() - i)
     const { ymd, startUtc, endUtc } = jakartaDayRange(day)
-    const label = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' }).format(startUtc)
+    const label = dtFmt('id-ID', 'daylabel', { day: '2-digit', month: 'short' }).format(startUtc)
     ranges.push({ ymd, startUtc, endUtc, label })
   }
   return ranges
 }
 
 export function jakartaMonthRange(now: Date = new Date()): { startUtc: Date; endUtc: Date } {
-  const ym = new Intl.DateTimeFormat('en-CA', {
+  const ym = dtFmt('en-CA', 'ym', {
     timeZone: JAKARTA_TZ,
     year: 'numeric',
     month: '2-digit',
@@ -100,7 +124,7 @@ export function jakartaMonthRange(now: Date = new Date()): { startUtc: Date; end
 
 // dd MMM yyyy, HH:mm versi panjang untuk detail transaksi.
 export function formatDateTimeLongID(date: Date | string | number): string {
-  return new Intl.DateTimeFormat('id-ID', {
+  return dtFmt('id-ID', 'long', {
     timeZone: JAKARTA_TZ,
     day: 'numeric',
     month: 'long',

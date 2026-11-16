@@ -207,7 +207,7 @@ export default function SettingsView() {
                   <div className="size-20 rounded-xl border bg-muted/50 flex items-center justify-center overflow-hidden shrink-0">
                     {user.tenant?.logoUrl ? (
                        
-                      <img src={user.tenant.logoUrl} alt={`Logo ${user.tenant.businessName}`} className="size-full object-contain" />
+                      <img src={user.tenant.logoUrl} alt={`Logo ${user.tenant.businessName}`} loading="lazy" decoding="async" className="size-full object-contain" />
                     ) : (
                       <ImagePlus className="size-7 text-muted-foreground" aria-hidden="true" />
                     )}

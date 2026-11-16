@@ -489,6 +489,7 @@ export default function PosView() {
               src={user.tenant.logoUrl}
               alt={`Logo ${user.tenant.businessName ?? "toko"}`}
               className="size-9 rounded-lg object-cover shrink-0 ring-1 ring-border/60"
+            decoding="async"
             />
           ) : (
             <img src="/logo-icon.png" alt="" className="h-9 w-auto" aria-hidden="true" />

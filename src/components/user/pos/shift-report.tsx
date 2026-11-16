@@ -84,6 +84,7 @@ export function ShiftReport({
               src={store.logoUrl}
               alt={`Logo ${store.businessName}`}
               className="h-12 w-auto object-contain shrink-0"
+            decoding="async"
             />
           )}
           <div className="min-w-0">
