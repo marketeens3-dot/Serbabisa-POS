@@ -340,9 +340,12 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
     <AppContext.Provider value={ctx}>
       <div className="min-h-screen flex flex-col">
         <div className="flex flex-1 min-h-0">
-          {/* Sidebar desktop — navy solid, bersih & mudah dibaca */}
-          <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border sticky top-0 h-screen">
-            <SidebarContent user={user} nav={nav} path={path} navigate={navigate} onLogout={logout} alertCount={stockAlerts?.count ?? 0} />
+          {/* Sidebar desktop — panel navigasi terang ala desain terbaru, sama
+              persis dengan drawer mobile: gradien biru-lavender, tile ikon
+              rounded, item aktif pill gradien + kartu profil di dasar. Dark
+              mode tetap navy (var --sidebar) seperti drawer. */}
+          <aside className="hidden lg:flex flex-col w-72 shrink-0 sticky top-0 h-screen border-r border-border/60 bg-gradient-to-b from-sky-100 via-slate-50 to-indigo-100 dark:from-sidebar dark:via-sidebar dark:to-sidebar dark:text-sidebar-foreground">
+            <SidebarNavContent user={user} nav={nav} path={path} navigate={navigate} onLogout={logout} alertCount={stockAlerts?.count ?? 0} />
           </aside>
 
           <div className="flex-1 flex flex-col min-w-0">
@@ -355,42 +358,48 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
               "max-lg:border-b-0 max-lg:bg-transparent max-lg:supports-[backdrop-filter]:bg-transparent",
               posMode && "max-lg:hidden"
             )}>
-              {/* Pill putih ala desain: hamburger + judul dalam satu kapsul
-                  rounded (mobile); di desktop judul polos semula. */}
-              {showNavDrawer ? (
-                <div className="flex items-center gap-0.5 rounded-2xl bg-card pl-1 pr-4 py-1 shadow-sm ring-1 ring-black/[0.03] min-w-0 max-w-[75%]">
-                  <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="Buka menu navigasi" className="size-9">
-                        <Menu className="size-5" />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent
-                      side="left"
-                      className="p-0 w-[304px] border-0 text-foreground bg-gradient-to-b from-sky-100 via-slate-50 to-indigo-100 dark:from-sidebar dark:via-sidebar dark:to-sidebar dark:text-sidebar-foreground"
+              {/* Pill putih ala desain: hamburger (hanya < lg) + judul dalam satu
+                  kapsul rounded — konsisten di desktop & mobile. */}
+              <div
+                className={cn(
+                  "flex items-center rounded-2xl bg-card shadow-sm ring-1 ring-black/[0.03] min-w-0 max-w-[75%]",
+                  showNavDrawer ? "gap-0.5 pl-1 pr-4 py-1" : "pl-4 pr-4 py-1.5"
+                )}
+              >
+                <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Buka menu navigasi"
+                      className={cn("size-9", !showNavDrawer && "hidden")}
                     >
-                      <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
-                      <SheetDescription className="sr-only">
-                        Pilih halaman untuk dibuka dari daftar menu di bawah.
-                      </SheetDescription>
-                      <MobileNavContent
-                        user={user}
-                        nav={nav}
-                        path={path}
-                        navigate={(p) => {
-                          navigate(p)
-                          setDrawerOpen(false)
-                        }}
-                        onLogout={logout}
-                        alertCount={stockAlerts?.count ?? 0}
-                      />
-                    </SheetContent>
-                  </Sheet>
-                  <h2 className="font-bold text-lg tracking-tight truncate">{title}</h2>
-                </div>
-              ) : (
-                <h2 className="font-semibold text-base lg:text-lg truncate">{title}</h2>
-              )}
+                      <Menu className="size-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent
+                    side="left"
+                    className="p-0 w-[304px] border-0 text-foreground bg-gradient-to-b from-sky-100 via-slate-50 to-indigo-100 dark:from-sidebar dark:via-sidebar dark:to-sidebar dark:text-sidebar-foreground"
+                  >
+                    <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
+                    <SheetDescription className="sr-only">
+                      Pilih halaman untuk dibuka dari daftar menu di bawah.
+                    </SheetDescription>
+                    <SidebarNavContent
+                      user={user}
+                      nav={nav}
+                      path={path}
+                      navigate={(p) => {
+                        navigate(p)
+                        setDrawerOpen(false)
+                      }}
+                      onLogout={logout}
+                      alertCount={stockAlerts?.count ?? 0}
+                    />
+                  </SheetContent>
+                </Sheet>
+                <h2 className={cn("font-bold tracking-tight truncate", showNavDrawer ? "text-lg" : "text-base lg:text-lg")}>{title}</h2>
+              </div>
               <div className="flex-1" />
               {user.tenant && (
                 <div className="hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 backdrop-blur-sm pl-3 pr-3.5 py-1.5 max-w-[280px]">
@@ -404,9 +413,10 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
             </header>
 
             {/* Konten — pb ekstra di bawah lg memberi ruang untuk bottom nav.
-                Mobile: latar gradien biru-lavender lembut ala desain (dark mode
-                tetap polos). */}
-            <main className="flex-1 p-4 sm:p-5 lg:p-6 xl:p-8 max-lg:pb-24 max-w-full max-lg:bg-gradient-to-b max-lg:from-sky-100 max-lg:via-indigo-50/70 max-lg:to-indigo-100 dark:max-lg:from-transparent dark:max-lg:via-transparent dark:max-lg:to-transparent">
+                Latar gradien biru-lavender lembut ala desain di SEMUA ukuran —
+                versi desktop sedikit lebih tipis agar kartu putih tetap napas.
+                Dark mode tetap polos. */}
+            <main className="flex-1 p-4 sm:p-5 lg:p-6 xl:p-8 max-lg:pb-24 max-w-full bg-gradient-to-b from-sky-100 via-indigo-50/70 to-indigo-100 lg:from-sky-50 lg:via-indigo-50/60 lg:to-indigo-100/60 dark:from-transparent dark:via-transparent dark:to-transparent">
               <div key={path} className="sb-fade-in">
                 {view}
               </div>
@@ -550,103 +560,14 @@ function BottomNav({
   )
 }
 
-function SidebarContent({
-  user,
-  nav,
-  path,
-  navigate,
-  onLogout,
-  alertCount,
-}: {
-  user: SessionUserDTO
-  nav: NavItem[]
-  path: string
-  navigate: (p: string) => void
-  onLogout: () => void
-  alertCount: number
-}) {
-  const isActive = (item: NavItem) => {
-    const itemPath = item.path
-    if (item.end) return path === itemPath || path === `${itemPath}/` || path === "" || path === "/"
-    return path.startsWith(itemPath)
-  }
-  return (
-    <div className="relative flex flex-col h-full overflow-hidden">
-      {/* Hiasan lembut di dasar sidebar (non-interaktif, murni visual ala tema) */}
-      <div className="pointer-events-none absolute -bottom-10 -right-10 size-44 rounded-full bg-primary/15 blur-2xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute bottom-16 -left-14 size-32 rounded-full bg-sky-400/10 blur-2xl" aria-hidden="true" />
-      <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
-        <img src="/logo-icon.png" alt="Logo Serbabisa" className="h-8.5 w-auto drop-shadow" />
-        <div className="min-w-0">
-          <p className="font-semibold tracking-tight text-white truncate">
-            Serba<span className="text-sky-400">bisa</span>
-          </p>
-          <p className="text-[11px] text-zinc-400 truncate">
-            {user.role === "SUPER_ADMIN" ? "Super Admin" : "POS Kasir"}
-          </p>
-        </div>
-      </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Navigasi utama">
-        {nav.map((item) => {
-          const active = isActive(item)
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={cn(
-                "sb-wiggle w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-left transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              <item.icon className={cn("sb-wiggle-target size-4.5 shrink-0", active ? "text-white" : "")} aria-hidden="true" />
-              <span className="truncate">{item.label}</span>
-              {item.path === "/app/products" && alertCount > 0 && (
-                <span
-                  className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold leading-none flex items-center justify-center tabular-nums shrink-0"
-                  title={`${alertCount} produk stok menipis`}
-                  aria-label={`${alertCount} produk stok menipis`}
-                >
-                  {alertCount > 99 ? "99+" : alertCount}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </nav>
-      <div className="p-3 border-t border-sidebar-border shrink-0">
-        <div className="flex items-center gap-3 rounded-lg px-2.5 py-2.5">
-          <div className="size-9 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-sm shrink-0" aria-hidden="true">
-            {user.fullName.slice(0, 1).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-white truncate">{user.fullName}</p>
-            <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
-          </div>
-          <button
-            onClick={onLogout}
-            className="text-zinc-400 hover:text-white p-2 rounded-md hover:bg-sidebar-accent/60 transition-colors"
-            aria-label="Keluar dari aplikasi"
-            title="Keluar"
-          >
-            <LogOut className="size-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* ThemeToggle & UserMenu diekstrak ke ./user-menu — dipakai bersama
    topbar desktop dan header mobile POS. */
 
-/* Drawer navigasi mobile (ponsel/tablet) — desain terang ala referensi:
-   logo + "Serbabisa / POS Kasir", tiap item punya tile ikon rounded, item
-   AKTIF = pill gradien biru + chevron + garis aksen di tepi kiri, kartu
-   profil + tombol keluar di dasar. Desktop sidebar (navy) tidak berubah. */
-function MobileNavContent({
+/* Panel navigasi desain terang ala referensi — DIPAKAI BERSAMA drawer
+   mobile DAN sidebar desktop: logo + "Serbabisa / POS Kasir", tiap item
+   punya tile ikon rounded, item AKTIF = pill gradien biru + chevron +
+   garis aksen di tepi kiri, kartu profil + tombol keluar di dasar. */
+function SidebarNavContent({
   user,
   nav,
   path,
@@ -685,7 +606,13 @@ function MobileNavContent({
         </div>
       </div>
 
-      <nav className="relative flex-1 overflow-y-auto px-3 pb-3 pt-1 space-y-1" aria-label="Navigasi utama">
+      {/* Mask fade di tepi bawah: item yang terpotong saat scroll memudar
+          halus alih-alih terpotong mentah tepat di atas kartu profil —
+          bekerja di tema terang maupun gelap tanpa hardcoded warna. */}
+      <nav
+        className="relative flex-1 min-h-0 overflow-y-auto px-3 pb-8 pt-1 space-y-1 [mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-2.5rem),transparent)]"
+        aria-label="Navigasi utama"
+      >
         {nav.map((item) => {
           const active = isActive(item)
           return (
