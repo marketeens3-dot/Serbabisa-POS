@@ -148,7 +148,10 @@ export default function TransactionsView() {
                 <TableHead className="hidden md:table-cell">Tanggal</TableHead>
                 <TableHead className="hidden sm:table-cell">Pelanggan</TableHead>
                 <TableHead className="hidden lg:table-cell">Kasir</TableHead>
-                <TableHead>Metode</TableHead>
+                {/* Metode: sembunyi di ponsel — tanpa ini kolom Total (paling
+                    penting) terpotong di tepi layar 360-390px. Detail metode
+                    tetap terlihat di halaman detail transaksi. */}
+                <TableHead className="hidden sm:table-cell">Metode</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
@@ -166,7 +169,7 @@ export default function TransactionsView() {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">{tx.customerName ?? "Umum"}</TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">{tx.cashierName ?? "—"}</TableCell>
-                  <TableCell><PaymentMethodBadge method={tx.paymentMethod} /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><PaymentMethodBadge method={tx.paymentMethod} /></TableCell>
                   <TableCell><TransactionStatusBadge status={tx.status} /></TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     <MoneyCell amount={tx.totalAmount} className={tx.status === "VOID" ? "line-through text-muted-foreground" : "font-semibold"} />

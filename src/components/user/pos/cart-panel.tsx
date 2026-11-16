@@ -119,27 +119,127 @@ export function CartPanel({
   const netSubtotal = subtotal - itemDiscountTotal
   const total = Math.max(0, netSubtotal - discount)
 
-  /** Sheet mobile kosong: strip ringan (tanpa ilustrasi besar & ringkasan). */
+  /** Sheet mobile kosong: strip ringan satu baris — tanpa header & tanpa handle. */
   const emptyMini = mobileSheet && cart.length === 0
-  /** Sheet mobile berisi & tertutup: strip header saja + total. */
+  /** Sheet mobile berisi & tertutup: strip satu baris (item + total + chevron). */
   const collapsedStrip = mobileSheet && !expanded && cart.length > 0
-  /** Isi sheet (daftar + ringkasan) hanya saat desktop, atau mobile yang sedang diperluas. */
-  const showBody = !mobileSheet || expanded
+
+  /* --------------------- Mobile: strip super ringan --------------------- */
+  // KOSONG → tanpa keranjang ditahan: TIDAK ada strip sama sekali — katalog
+  // penuh, dan pesan "keranjang kosong" cukup tampil di bar bawah (pos-view).
+  if (emptyMini && parkedCarts.length === 0) {
+    return (
+      <NewCustomerDialog
+        open={newCustomerOpen}
+        onOpenChange={setNewCustomerOpen}
+        onCreated={(c) => {
+          setCustomerId(c.id)
+          onCustomersChanged()
+          toast.success(`Pelanggan ${c.name} ditambahkan.`)
+        }}
+      />
+    )
+  }
+
+  // KOSONG + ada keranjang ditahan → satu baris tipis dengan akses "Pesanan".
+  if (emptyMini) {
+    return (
+      <>
+        <div
+          className="rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg flex items-center gap-2.5 px-4 py-3 no-print"
+          role="status"
+        >
+          <span
+            className="size-8 rounded-lg bg-muted/60 text-muted-foreground flex items-center justify-center shrink-0"
+            aria-hidden="true"
+          >
+            <ShoppingCart className="size-4" />
+          </span>
+          <p className="text-xs text-muted-foreground min-w-0 flex-1">
+            Keranjang kosong — pilih produk untuk mulai transaksi.
+          </p>
+          {parkedCarts.length > 0 && (
+            <div className="shrink-0 -mr-1.5">
+              <ParkedCartsControls
+                carts={parkedCarts}
+                cartEmpty
+                onPark={onPark}
+                onResume={onResumeParked}
+                onDelete={onDeleteParked}
+              />
+            </div>
+          )}
+        </div>
+        <NewCustomerDialog
+          open={newCustomerOpen}
+          onOpenChange={setNewCustomerOpen}
+          onCreated={(c) => {
+            setCustomerId(c.id)
+            onCustomersChanged()
+            toast.success(`Pelanggan ${c.name} ditambahkan.`)
+          }}
+        />
+      </>
+    )
+  }
+
+  // BERISI & TERTUTUP → strip satu baris: nama + jumlah item + TOTAL + chevron.
+  // Seluruh strip adalah tombol buka (target sentuh besar ala app native).
+  // Tombol Tahan/Pesanan hanya tampil di dalam sheet yang diperluas — di strip
+  // mereka menyebabkan judul "(N item)" terpotong pada layar 360-390px.
+  if (collapsedStrip) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-expanded={false}
+          aria-label={`Buka keranjang — ${cart.length} item, total ${formatIDR(total)}`}
+          className="w-full rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg flex items-center gap-2.5 px-4 py-3 text-left no-print transition-transform active:scale-[0.99]"
+        >
+          <span
+            className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"
+            aria-hidden="true"
+          >
+            <ShoppingCart className="size-4.5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="font-semibold text-sm block leading-tight">
+              Keranjang <span className="text-muted-foreground font-medium">· {cart.length} item</span>
+            </span>
+            <span className="text-[11px] text-muted-foreground block leading-tight mt-0.5">
+              Ketuk untuk lihat &amp; ubah item
+            </span>
+          </span>
+          <span className="text-base font-bold text-primary tabular shrink-0">{formatIDR(total)}</span>
+          <ChevronDown className="size-4 text-muted-foreground shrink-0" aria-hidden="true" />
+        </button>
+        <NewCustomerDialog
+          open={newCustomerOpen}
+          onOpenChange={setNewCustomerOpen}
+          onCreated={(c) => {
+            setCustomerId(c.id)
+            onCustomersChanged()
+            toast.success(`Pelanggan ${c.name} ditambahkan.`)
+          }}
+        />
+      </>
+    )
+  }
 
   return (
     <div
-      className={cn(
-        "overflow-hidden rounded-t-3xl lg:rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg shadow-primary/5 flex flex-col",
-        !emptyMini && !collapsedStrip ? "max-h-[46vh] lg:max-h-[calc(100vh-6.5rem)]" : "",
-      )}
+      className="overflow-hidden rounded-t-3xl lg:rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg shadow-primary/5 flex flex-col max-h-[46vh] lg:max-h-[calc(100vh-6.5rem)]"
     >
-      {/* Handle sheet — hanya mobile ala referensi; ketuk juga membuka/menutup */}
+      {/* Handle sheet — hanya mobile ala referensi; ketuk untuk menutup.
+          (Di jalur ini mobile selalu expanded — strip kosong/tertutup sudah
+          ditangani early-return di atas.) */}
       {mobileSheet ? (
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => setExpanded(false)}
           className="mx-auto mt-2.5 mb-1 h-5 w-10 flex items-end justify-center lg:hidden cursor-pointer"
-          aria-label={expanded ? "Tutup keranjang" : "Buka keranjang"}
+          aria-label="Tutup keranjang"
           tabIndex={-1}
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/25" aria-hidden="true" />
@@ -147,16 +247,16 @@ export function CartPanel({
       ) : (
         <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-muted-foreground/25 lg:hidden" aria-hidden="true" />
       )}
-      {/* Header — mobile: seluruh kiri header adalah tombol buka/tutup, dengan
-          total ringkas langsung terbaca di strip. Desktop: tampilan lama. */}
+      {/* Header — mobile (selalu expanded di jalur ini): kiri = tombol tutup,
+          kanan = Tahan/Pesanan + chevron. Desktop: tampilan lama. */}
       <div className="flex items-center gap-2 px-4 py-3 border-b">
         {mobileSheet ? (
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setExpanded(false)}
             className="flex items-center gap-2 min-w-0 flex-1 text-left"
-            aria-expanded={expanded}
-            aria-label={expanded ? "Tutup keranjang" : `Buka keranjang — ${cart.length} item, total ${formatIDR(total)}`}
+            aria-expanded
+            aria-label={`Tutup keranjang — ${cart.length} item, total ${formatIDR(total)}`}
           >
             <span
               className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"
@@ -166,13 +266,17 @@ export function CartPanel({
             </span>
             <span className="min-w-0">
               <span className="font-semibold text-sm whitespace-nowrap block leading-tight">
-                Keranjang <span className="text-muted-foreground font-medium">({cart.length} item)</span>
+                Keranjang
               </span>
-              {cart.length > 0 && (
-                <span className="text-xs font-semibold text-primary tabular block leading-tight mt-0.5">
-                  {formatIDR(total)}
-                </span>
-              )}
+              <span className="text-xs text-muted-foreground tabular block leading-tight mt-0.5 truncate">
+                {cart.length} item
+                {cart.length > 0 && (
+                  <>
+                    {" · "}
+                    <span className="font-semibold text-primary">{formatIDR(total)}</span>
+                  </>
+                )}
+              </span>
             </span>
           </button>
         ) : (
@@ -189,6 +293,10 @@ export function CartPanel({
           </>
         )}
         <div className="ml-auto flex items-center gap-1.5">
+          {/* Tahan + Pesanan hanya di sheet yang DIPERLUAS — di strip tertutup
+              keduanya menyebabkan judul/total terpotong pada layar 360-390px.
+              Chevron penutup dihapus di mobile: handle di atas & header kiri
+              sudah berfungsi menutup. */}
           <ParkedCartsControls
             carts={parkedCarts}
             cartEmpty={cart.length === 0}
@@ -196,38 +304,9 @@ export function CartPanel({
             onResume={onResumeParked}
             onDelete={onDeleteParked}
           />
-          {mobileSheet && cart.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              aria-expanded={expanded}
-              aria-label={expanded ? "Tutup keranjang" : "Buka keranjang"}
-            >
-              {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            </button>
-          )}
         </div>
       </div>
 
-      {emptyMini ? (
-        /* Strip ringan satu baris — keranjang kosong tidak boleh menutupi
-           katalog; ponsel kasir fokus ke pemilihan produk. */
-        <div className="flex items-center gap-2.5 px-4 py-3" role="status">
-          <span
-            className="size-8 rounded-lg bg-muted/60 text-muted-foreground flex items-center justify-center shrink-0"
-            aria-hidden="true"
-          >
-            <ShoppingCart className="size-4" />
-          </span>
-          <p className="text-xs text-muted-foreground min-w-0 flex-1">
-            Keranjang kosong — pilih produk di bawah untuk mulai transaksi.
-          </p>
-        </div>
-      ) : (
-        <>
-        {showBody && (
-        <>
       {/* Isi sheet — SATU area gulir (tips + daftar item + ringkasan): total
           selalu terjangkau dengan scroll, sisanya terpotong rapi oleh
           overflow-hidden — tidak pernah menimpa bar "Bayar Sekarang". */}
@@ -581,10 +660,6 @@ export function CartPanel({
         </div>
         </div>
       </div>
-        </>
-        )}
-        </>
-      )}
 
       <NewCustomerDialog
         open={newCustomerOpen}

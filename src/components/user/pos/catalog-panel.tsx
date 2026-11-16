@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QtyDialog } from "@/components/user/pos/qty-dialog";
-import { LongPressTip, dismissLongPressTip } from "@/components/user/pos/long-press-tip";
+import { LongPressTip, dismissLongPressTip, useLongPressTipVisible } from "@/components/user/pos/long-press-tip";
 import { cn } from "@/lib/utils";
 import { useApi, useDebounced, useResetOnKeyChange } from "@/hooks/use-api";
 import { api } from "@/lib/api-client";
@@ -60,7 +60,10 @@ export function CatalogPanel({
 
   // Tip "Enter" ala referensi — sekali tampil per perangkat, bisa ditutup,
   // dan hanya di tampilan default (tersembunyi saat sedang mencari).
+  // Ditambah: disembunyikan selama tip tekan-tahan tampil — dua banner tips
+  // menumpuk terlalu banyak di layar ponsel; tampilkan satu per satu.
   const enterTipVisible = useSyncExternalStore(subscribeTipChange, getTipEnterVisible, () => false)
+  const longPressTipVisible = useLongPressTipVisible()
   function dismissEnterTip() {
     try {
       localStorage.setItem(TIP_ENTER_KEY, "1")
@@ -229,8 +232,9 @@ export function CatalogPanel({
         </Button>
       </div>
 
-      {/* Banner tip biru ala referensi — kontekstual, sekali per perangkat */}
-      {enterTipVisible && !search && (
+      {/* Banner tip biru ala referensi — kontekstual, sekali per perangkat, dan
+          hanya SATU banner tips pada satu waktu (tip tekan-tahan menang). */}
+      {enterTipVisible && !search && !longPressTipVisible && (
         <div
           className="flex items-center gap-2.5 rounded-xl border border-sky-500/25 bg-sky-500/[0.08] px-3.5 py-2.5"
           role="status"

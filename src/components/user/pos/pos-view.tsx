@@ -9,9 +9,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { ArrowRight, Bell, CreditCard, LayoutGrid, Plus, ShoppingCart } from "lucide-react";
+import { ArrowRight, Bell, CreditCard, Plus, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useApi } from "@/hooks/use-api";
 import { CatalogPanel } from "@/components/user/pos/catalog-panel";
 import { CartPanel } from "@/components/user/pos/cart-panel";
 import { CheckoutDialog } from "@/components/user/pos/checkout-dialog";
@@ -68,9 +71,12 @@ async function fetchActiveItems(ids: Set<string>): Promise<Map<string, CatalogIt
 }
 
 export default function PosView() {
-  const { user, navigate, logout, openNavDrawer, stockAlertCount } = useApp()
+  const { user, navigate, logout, stockAlertCount } = useApp()
   const isBelowLg = useIsBelowLg()
   const tenantId = user.tenant?.id ?? null
+  // Maskot sapaan: false = coba muat /public/mascot/<tenantId>.png (ada → gambar
+  // maskot toko, khusus Platter Tea saat ini); true / tanpa tenant → emoji blob.
+  const [mascotFailed, setMascotFailed] = useState(false)
   const [cart, setCart] = useState<CartLine[]>([])
   const [customerId, setCustomerId] = useState<string | null>(null)
   /* Diskon transaksi: mode "rp" (nominal manual) atau "pct" (persen diterapkan ke
@@ -470,11 +476,23 @@ export default function PosView() {
   )
 
   return (
-    <div className="max-w-[1600px] mx-auto max-lg:pb-52">
+    // pb mobile: 128px — menutup bar Bayar melayang (48px @ 70.4px) + bottom
+    // nav (64px) + safe-area, agar kartu katalog terakhir tak tertutup tombol.
+    <div className="max-w-[1600px] mx-auto max-lg:pb-32">
       {/* ---------- Header mobile ala referensi: brand + sapaan + notifikasi ---------- */}
       <header className="lg:hidden mb-4">
         <div className="flex items-center gap-2.5">
-          <img src="/logo-icon.png" alt="" className="h-9 w-auto" aria-hidden="true" />
+          {/* Logo TOKO (diunggah dari Pengaturan → profil toko); tanpa logo →
+              fallback ke logo Serbabisa. */}
+          {user.tenant?.logoUrl ? (
+            <img
+              src={user.tenant.logoUrl}
+              alt={`Logo ${user.tenant.businessName ?? "toko"}`}
+              className="size-9 rounded-lg object-cover shrink-0 ring-1 ring-border/60"
+            />
+          ) : (
+            <img src="/logo-icon.png" alt="" className="h-9 w-auto" aria-hidden="true" />
+          )}
           <div className="min-w-0 flex-1">
             <p className="font-bold text-lg tracking-tight leading-tight truncate">
               {user.tenant?.businessName ?? "Serbabisa"}
@@ -482,17 +500,7 @@ export default function PosView() {
             <p className="text-[11px] text-muted-foreground truncate">Transaksi cepat, lebih mudah</p>
           </div>
           <SyncIndicator />
-          <button
-            type="button"
-            onClick={() => navigate("/app/products/stok")}
-            className="relative size-9 flex items-center justify-center rounded-full bg-card border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label={stockAlertCount > 0 ? `${stockAlertCount} produk stok menipis — lihat daftar` : "Notifikasi"}
-          >
-            <Bell className="size-4.5" aria-hidden="true" />
-            {stockAlertCount > 0 && (
-              <span className="absolute top-1 right-1 size-2.5 rounded-full bg-red-500 ring-2 ring-background" aria-hidden="true" />
-            )}
-          </button>
+          <StockAlertBell navigate={navigate} alertCount={stockAlertCount} />
           <UserMenu
             user={user}
             onProfile={() => navigate("/app/profile")}
@@ -506,14 +514,30 @@ export default function PosView() {
             <h1 className="text-[26px] leading-tight font-extrabold tracking-tight">Selamat Datang!</h1>
             <p className="text-sm text-muted-foreground mt-1">Semangat berjualan hari ini 💪</p>
           </div>
-          {/* Maskot ringan: emoji dalam blob pastel + gelembung keranjang (tanpa aset gambar) */}
-          <div className="relative shrink-0" aria-hidden="true">
-            <div className="size-16 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center text-4xl rotate-6">
-              🧋
-            </div>
-            <div className="absolute -bottom-1.5 -left-2.5 size-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md">
-              <ShoppingCart className="size-3.5" />
-            </div>
+          {/* Maskot sapaan: tenant dengan aset maskot (/public/mascot/<tenantId>.png)
+              memakai gambar khusus — Platter Tea punya maskot gelas melambai "Hai!".
+              Tenant lain (tanpa file) → fallback emoji dalam blob pastel + gelembung
+              keranjang. aria-hidden: murni dekoratif. */}
+          <div className="relative shrink-0 flex items-start" aria-hidden="true">
+            {user.tenant && !mascotFailed ? (
+              <img
+                key={user.tenant.id}
+                src={`/mascot/${user.tenant.id}.png`}
+                alt=""
+                onError={() => setMascotFailed(true)}
+                className="size-20 -mr-1 object-contain object-bottom drop-shadow-sm"
+                draggable={false}
+              />
+            ) : (
+              <>
+                <div className="size-16 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center text-4xl rotate-6">
+                  🧋
+                </div>
+                <div className="absolute -bottom-1.5 -left-2.5 size-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md">
+                  <ShoppingCart className="size-3.5" />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -561,33 +585,37 @@ export default function PosView() {
             )}
           </div>
 
-          {/* ---------- Bar aksi bawah (mobile ala referensi): Menu + Bayar Sekarang ----------
+          {/* ---------- Bar aksi bawah (mobile ala referensi): Bayar Sekarang.
+              Tombol "Menu" pindah ke bottom nav (ujung kanan, sebelah Pengaturan)
+              — bar ini khusus aksi keranjang. Keranjang KOSONG: pill status ringan
+              menggantikan tombol Bayar besar yang disabled.
               PORTAL ke body — alasan sama dengan sheet keranjang di atas. */}
           {createPortal(
             <div
               className="fixed inset-x-3 bottom-[4.4rem] z-40 flex items-center gap-2 lg:hidden no-print"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
-              <Button
-                variant="outline"
-                onClick={openNavDrawer}
-                className="h-12 rounded-full px-4 gap-2 bg-card shadow-md shrink-0 active:scale-[0.97] font-semibold"
-                aria-label="Buka menu navigasi"
-              >
-                <LayoutGrid className="size-4.5 text-primary" aria-hidden="true" />
-                Menu
-              </Button>
-              <Button
-                className="flex-1 h-12 rounded-full text-base font-bold gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
-                disabled={cart.length === 0 || submitting || discount > subtotal - itemDiscountTotal || payLocked}
-                onClick={openCheckout}
-                title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
-                aria-label={`Bayar Sekarang — ${formatIDR(Math.max(0, subtotal - itemDiscountTotal - discount))}`}
-              >
-                <CreditCard className="size-4.5" aria-hidden="true" />
-                Bayar Sekarang
-                <ArrowRight className="size-4.5" aria-hidden="true" />
-              </Button>
+              {cart.length === 0 ? (
+                <div
+                  className="flex-1 h-12 rounded-full border border-border/60 bg-card/95 backdrop-blur-xl px-4 flex items-center gap-2.5 shadow-md text-sm text-muted-foreground"
+                  role="status"
+                >
+                  <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">Keranjang kosong — pilih produk untuk mulai</span>
+                </div>
+              ) : (
+                <Button
+                  className="flex-1 h-12 rounded-full text-base font-bold gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
+                  disabled={submitting || discount > subtotal - itemDiscountTotal || payLocked}
+                  onClick={openCheckout}
+                  title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
+                  aria-label={`Bayar Sekarang — ${formatIDR(Math.max(0, subtotal - itemDiscountTotal - discount))}`}
+                >
+                  <CreditCard className="size-4.5" aria-hidden="true" />
+                  Bayar Sekarang
+                  <ArrowRight className="size-4.5" aria-hidden="true" />
+                </Button>
+              )}
             </div>,
             document.body
           )}
@@ -662,5 +690,94 @@ export default function PosView() {
         }}
       />
     </div>
+  )
+}
+
+/* ---------- Lonceng notifikasi (header mobile POS) ----------
+   Lonceng = notifikasi sungguhan, bukan navigasi diam-diam: klik membuka
+   popover berisi daftar produk yang stoknya menyentuh ambang minimum
+   (endpoint ringan /api/catalog/stock-alerts, cache 2 menit) + pintasan ke
+   halaman Stok. Tanpa peringatan → state kosong yang jujur. */
+type StockAlertEntry = { id: string; name: string; stockQty: number; minStockQty: number; unit: string }
+
+function StockAlertBell({ navigate, alertCount }: { navigate: (p: string) => void; alertCount: number }) {
+  const [open, setOpen] = useState(false)
+  const { data, loading } = useApi<{ data: StockAlertEntry[]; count: number }>(
+    open ? "/api/catalog/stock-alerts" : null
+  )
+  const entries = data?.data ?? []
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="relative size-9 flex items-center justify-center rounded-full bg-card border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={alertCount > 0 ? `${alertCount} notifikasi stok menipis` : "Notifikasi"}
+          aria-haspopup="dialog"
+        >
+          <Bell className="size-4.5" aria-hidden="true" />
+          {alertCount > 0 && (
+            <span
+              className="absolute -top-1 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9.5px] font-bold leading-none flex items-center justify-center tabular-nums ring-2 ring-background"
+              aria-hidden="true"
+            >
+              {alertCount > 99 ? "99+" : alertCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-3">
+        <p className="text-sm font-semibold">Notifikasi</p>
+        <p className="text-xs text-muted-foreground mb-2">Stok produk yang perlu diisi ulang.</p>
+        {loading ? (
+          <div className="space-y-2 py-1">
+            <Skeleton className="h-11 w-full rounded-lg" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="text-xs text-muted-foreground rounded-lg border border-border/60 bg-muted/40 px-3 py-3 text-center">
+            Tidak ada notifikasi — semua stok aman.
+          </p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto -mx-1 px-1">
+            <ul className="space-y-1">
+              {entries.map((e) => (
+                <li key={e.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      navigate("/app/products/stok")
+                    }}
+                    className="w-full text-left rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors flex items-center gap-2"
+                  >
+                    <span className="size-1.5 rounded-full bg-red-500 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-xs font-medium block leading-tight truncate">{e.name}</span>
+                      <span className="text-[11px] text-destructive block leading-tight tabular">
+                        Stok {formatQty(e.stockQty)} {e.unit} · min {formatQty(e.minStockQty)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {entries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              navigate("/app/products/stok")
+            }}
+            className="w-full mt-2 text-xs font-semibold text-primary text-center rounded-md py-1.5 hover:bg-primary/5 transition-colors"
+          >
+            Lihat semua di Stok →
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }

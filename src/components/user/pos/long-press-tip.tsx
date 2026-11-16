@@ -52,6 +52,12 @@ function getServerSnapshot(): boolean {
   return false;
 }
 
+/** Visibility untuk komponen lain — mis. menyembunyikan tip "Enter" selama
+    tip ini tampil, agar dua banner tips tidak menumpuk di layar ponsel. */
+export function useLongPressTipVisible(): boolean {
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
 export function LongPressTip() {
   const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 

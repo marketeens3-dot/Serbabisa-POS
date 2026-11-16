@@ -247,48 +247,9 @@ export function CheckoutDialog({
             )}
           </div>
 
-          {/* Proyek RAB */}
-          {projects.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="proj-sel" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Untuk proyek / RAB (opsional)
-              </Label>
-              <select
-                id="proj-sel"
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-              >
-                <option value="">— Penjualan reguler —</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
-                ))}
-              </select>
-              {projectId && (
-                <p className="text-xs text-muted-foreground">Transaksi ini otomatis dicatat sebagai realisasi proyek.</p>
-              )}
-            </div>
-          )}
-
-          {/* Pajak opsional */}
-          <details className="text-sm">
-            <summary className="text-xs font-medium uppercase tracking-wide text-muted-foreground cursor-pointer select-none hover:text-foreground">
-              Pajak / biaya tambahan (opsional)
-            </summary>
-            <div className="mt-2.5 flex items-center gap-2">
-              <Input
-                type="number"
-                min={0}
-                value={taxAmount || ""}
-                placeholder="0"
-                onChange={(e) => setTaxAmount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                className="h-9 tabular"
-                aria-label="Pajak dalam rupiah"
-              />
-            </div>
-          </details>
-
-          {/* Total besar */}
+          {/* Total besar — dipindah ke dekat input bayar agar jalur kritis
+              (metode → total → bayar → kembalian) terlihat TANPA scroll di
+              sebagian besar ponsel; opsi jarang pakai masuk blok "Opsi lainnya". */}
           <div className="rounded-xl border bg-muted/40 p-4 flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">Total tagihan</span>
             <span className="text-2xl font-bold text-primary tabular">{formatIDR(total)}</span>
@@ -304,7 +265,7 @@ export function CheckoutDialog({
               inputMode="numeric"
               value={paidInput}
               onChange={(e) => setPaidInput(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder={String(total)}
+              placeholder="0"
               className="h-11 text-base font-semibold tabular"
               autoFocus
               aria-describedby="paid-hint"
@@ -348,31 +309,40 @@ export function CheckoutDialog({
             </div>
           )}
 
-          {/* Kembalian / sisa piutang */}
-          {isShort ? (
-            isTempo ? (
-              <div
-                className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between text-sm font-semibold text-amber-700 dark:text-amber-400"
-                aria-live="polite"
-              >
-                <span className="flex items-center gap-2">
-                  <HandCoins className="size-4 shrink-0" aria-hidden="true" />
-                  Jadi piutang (total − DP)
-                </span>
-                <span className="tabular">{formatIDR(dpShort)}</span>
-              </div>
-            ) : (
-              <div
-                className="rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 flex items-center justify-between text-sm font-semibold text-destructive"
-                aria-live="polite"
-              >
-                <span className="flex items-center gap-2">
-                  <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
-                  Kurang bayar
-                </span>
-                <span className="tabular">{formatIDR(dpShort)}</span>
-              </div>
-            )
+          {/* Status bayar — 4 keadaan: piutang tempo (amber), BELUM DIISI (netral —
+              bukan alarm merah palsu sebelum kasir mengetik apa pun), kurang
+              bayar (merah, hanya saat ada angka yang benar-benar kurang), dan
+              kembalian (hijau). */}
+          {isTempo ? (
+            <div
+              className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between text-sm font-semibold text-amber-700 dark:text-amber-400"
+              aria-live="polite"
+            >
+              <span className="flex items-center gap-2">
+                <HandCoins className="size-4 shrink-0" aria-hidden="true" />
+                Jadi piutang (total − DP)
+              </span>
+              <span className="tabular">{formatIDR(dpShort)}</span>
+            </div>
+          ) : paid === 0 ? (
+            <div
+              className="rounded-lg border border-border/60 bg-muted/40 px-3.5 py-2.5 flex items-center gap-2 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
+              <Wallet className="size-4 shrink-0" aria-hidden="true" />
+              Masukkan uang diterima dari pembeli — chip cepat di atas membantu.
+            </div>
+          ) : isShort ? (
+            <div
+              className="rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-2.5 flex items-center justify-between text-sm font-semibold text-destructive"
+              aria-live="polite"
+            >
+              <span className="flex items-center gap-2">
+                <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
+                Kurang bayar
+              </span>
+              <span className="tabular">{formatIDR(dpShort)}</span>
+            </div>
           ) : (
             <div
               className="rounded-lg border border-emerald-600/25 bg-emerald-600/10 px-3.5 py-2.5 flex items-center justify-between text-sm font-semibold text-emerald-700 dark:text-emerald-400"
@@ -392,27 +362,79 @@ export function CheckoutDialog({
             </p>
           )}
 
-          {/* Catatan */}
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Catatan (opsional)
-            </Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Catatan transaksi…"
-              rows={2}
-              maxLength={500}
-              className="text-sm"
-            />
-          </div>
+          {/* Opsi lainnya — pajak, proyek RAB, catatan. Jarang dipakai di jalur
+              cepat kasir; dipisah agar total & tombol Konfirmasi selalu terjangkau
+              tanpa scroll pada ponsel. */}
+          <details className="text-sm">
+            <summary className="text-xs font-medium uppercase tracking-wide text-muted-foreground cursor-pointer select-none hover:text-foreground">
+              Opsi lainnya — pajak, proyek, catatan (opsional)
+            </summary>
+            <div className="mt-3 space-y-4">
+              {/* Pajak opsional */}
+              <div className="space-y-2">
+                <Label htmlFor="tax" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pajak / biaya tambahan (Rp)
+                </Label>
+                <Input
+                  id="tax"
+                  type="number"
+                  min={0}
+                  value={taxAmount || ""}
+                  placeholder="0"
+                  onChange={(e) => setTaxAmount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className="h-9 tabular"
+                  aria-label="Pajak dalam rupiah"
+                />
+              </div>
 
-          <DialogFooter className="gap-2">
+              {/* Proyek RAB */}
+              {projects.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="proj-sel" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Untuk proyek / RAB
+                  </Label>
+                  <select
+                    id="proj-sel"
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  >
+                    <option value="">— Penjualan reguler —</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.code} — {p.name}</option>
+                    ))}
+                  </select>
+                  {projectId && (
+                    <p className="text-xs text-muted-foreground">Transaksi ini otomatis dicatat sebagai realisasi proyek.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Catatan */}
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Catatan
+                </Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Catatan transaksi…"
+                  rows={2}
+                  maxLength={500}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+          </details>
+
+          {/* Footer STICKY: Konfirmasi selalu terlihat di dasar dialog — di ponsel
+              pendek kasir tidak perlu menggulir mencari tombol bayar. */}
+          <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 px-6 pt-3 pb-5 flex-row gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 border-t border-border/60 rounded-b-lg">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Batal
             </Button>
-            <Button type="submit" className="font-bold h-10 active:scale-[0.98]" disabled={submitting || (!isTempo && (isShort || paid <= 0)) || tempoBlocked}>
+            <Button type="submit" className="flex-1 font-bold h-10 active:scale-[0.98]" disabled={submitting || (!isTempo && (isShort || paid <= 0)) || tempoBlocked}>
               {submitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />

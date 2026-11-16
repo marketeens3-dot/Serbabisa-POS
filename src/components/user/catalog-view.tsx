@@ -161,23 +161,58 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
         {loading ? (
           <div className="p-4"><LoadingRows rows={8} /></div>
         ) : !items.length ? (
-          <div className="p-6">
-            <EmptyState
-              icon={isProduct ? Package : Wrench}
-              title={isProduct ? "Belum ada produk" : "Belum ada jasa"}
-              description={
-                isProduct
-                  ? "Tambahkan produk pertama Anda untuk mulai berjualan."
-                  : "Tambahkan jasa pertama Anda untuk mulai berjualan."
-              }
-              action={
-                <Button onClick={() => { setEditing(null); setFormOpen(true) }}>
-                  <Plus className="size-4" />
-                  {isProduct ? "Tambah Produk" : "Tambah Jasa"}
-                </Button>
-              }
-            />
-          </div>
+          (() => {
+            /* Empty state cerdas: (1) filter aktif → ajak reset, jangan bilang
+               "belum ada produk" saat produknya ada tapi tidak lolos filter;
+               (2) halaman Stok tanpa hasil = kabar baik (stok aman);
+               (3) benar-benar kosong → ajak tambah item pertama. */
+            const defaultStatus = initialStatus ?? "ACTIVE"
+            const filterActive = search.trim() !== "" || categoryId !== "ALL" || status !== defaultStatus
+            if (filterActive) {
+              return (
+                <EmptyState
+                  icon={isProduct ? Package : Wrench}
+                  title={isProduct ? "Tidak ada produk yang cocok" : "Tidak ada jasa yang cocok"}
+                  description="Coba ubah kata kunci, kategori, atau status — atau reset filter."
+                  action={
+                    <Button
+                      variant="outline"
+                      onClick={() => { setSearch(""); setCategoryId("ALL"); setStatus(defaultStatus); setPage(1) }}
+                    >
+                      <Search className="size-4" />
+                      Reset filter
+                    </Button>
+                  }
+                />
+              )
+            }
+            if (initialStatus === "LOW_STOCK") {
+              return (
+                <EmptyState
+                  icon={isProduct ? Package : Wrench}
+                  title="Semua stok aman 🎉"
+                  description="Tidak ada produk yang menyentuh ambang minimum. Laporan stok menipis akan muncul di sini."
+                />
+              )
+            }
+            return (
+              <EmptyState
+                icon={isProduct ? Package : Wrench}
+                title={isProduct ? "Belum ada produk" : "Belum ada jasa"}
+                description={
+                  isProduct
+                    ? "Tambahkan produk pertama Anda untuk mulai berjualan."
+                    : "Tambahkan jasa pertama Anda untuk mulai berjualan."
+                }
+                action={
+                  <Button onClick={() => { setEditing(null); setFormOpen(true) }}>
+                    <Plus className="size-4" />
+                    {isProduct ? "Tambah Produk" : "Tambah Jasa"}
+                  </Button>
+                }
+              />
+            )
+          })()
         ) : (
           // py-3 sel — baris data lebih lega di-densi; grid terasa profesional
           <Table className="[&_td]:py-3 [&_th]:py-2.5">

@@ -409,9 +409,9 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
           </div>
         </div>
 
-        {/* Bottom nav — ponsel & tablet (< lg). Di POS memakai varian 4 tujuan
-            ala referensi (Beranda/Laporan/Produk/Pengaturan) tanpa tombol Menu —
-            "Menu" pindah ke bar bawah keranjang. */}
+        {/* Bottom nav — ponsel & tablet (< lg). 5 seluas jempol: 4 tujuan
+            tersering + "Menu" (drawer lengkap) di ujung kanan — termasuk di
+            POS, menggantikan tombol Menu melayang di bar bawah keranjang. */}
         {showNavDrawer && (
           <BottomNav
             path={path}
@@ -429,7 +429,8 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
 
 /* Navigasi bawah gaya aplikasi native — 4 tujuan tersering + Menu (drawer).
    Item aktif: warna primer + titik indikator di atas (gaya tab bar iOS).
-   Target sentuh: seluruh sel 64px tinggi, lebar ≥ 1/5 layar. */
+   Target sentuh: seluruh sel 64px tinggi, lebar ≥ 1/5 layar.
+   Tombol Menu (icon + badge stok) SELALU di ujung kanan — sebelah Pengaturan. */
 function BottomNav({
   path,
   navigate,
@@ -443,7 +444,7 @@ function BottomNav({
   onOpenMenu: () => void
   isAdmin: boolean
   alertCount: number
-  /** Varian POS: 4 tujuan ala referensi & tanpa tombol Menu. */
+  /** Varian POS: urutan tujuan 4 teratas mengikuti halaman kasir. */
   posMode?: boolean
 }) {
   const items: { label: string; path: string; icon: LucideIcon; end?: boolean }[] = isAdmin
@@ -478,7 +479,7 @@ function BottomNav({
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-[0_-8px_24px_-16px_rgb(0_0_0/0.18)] no-print"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className={cn("grid max-w-lg mx-auto h-16", posMode ? "grid-cols-4" : "grid-cols-5")}>
+      <div className="grid grid-cols-5 max-w-lg mx-auto h-16">
         {items.map((it) => {
           const active = isActive(it)
           return (
@@ -502,8 +503,7 @@ function BottomNav({
             </button>
           )
         })}
-        {!posMode && (
-          <button
+        <button
             type="button"
             onClick={onOpenMenu}
             aria-label={alertCount > 0 ? `Buka menu navigasi lengkap — ${alertCount} produk stok menipis` : "Buka menu navigasi lengkap"}
@@ -523,7 +523,6 @@ function BottomNav({
             </span>
             <span className="text-[10.5px] leading-none font-medium">Menu</span>
           </button>
-        )}
       </div>
     </nav>
   )
