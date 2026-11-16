@@ -13,7 +13,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CatalogItemFormDialog } from "@/components/user/catalog-item-form";
 import { MovementHistoryDialog } from "@/components/user/movement-history-dialog";
 import { StockAdjustDialog } from "@/components/user/stock-adjust-dialog";
-import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
+import { itemEmoji } from "@/lib/catalog-visual";
+import { usePastelFor } from "@/lib/use-pastel";
 import { cn } from "@/lib/utils";
 import {
   EmptyState,
@@ -48,6 +49,7 @@ function StatusPill({ active }: { active: boolean }) {
 }
 
 export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" | "SERVICE"; initialStatus?: string }) {
+  const pastel = usePastelFor()
   const { navigate, refreshStockAlerts } = useApp()
   const isProduct = type === "PRODUCT"
   const [search, setSearch] = useState("")
@@ -268,7 +270,7 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                           lebih membulat (rounded-2xl) ala desain */}
                       <span
                         className="relative size-11 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-lg ring-1 ring-inset ring-border/50"
-                        style={{ background: pastelFor(item.id) }}
+                        style={{ background: pastel(item.id) }}
                         aria-hidden="true"
                       >
                         {item.imageUrl ? (

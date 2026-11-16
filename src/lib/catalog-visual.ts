@@ -52,6 +52,18 @@ const PASTELS = [
   "linear-gradient(135deg, #ecfeff 0%, #cffafe 60%, #c3eff7 100%)", // cyan
 ] as const
 
+/** Palet mode gelap — turunan REDUP (alpha) dari palet light dengan urutan
+    hue yang sama, jadi seed yang sama memakai keluarga warna yang konsisten
+    di kedua tema. Dipakai via usePastelFor() (hook tema-aware). */
+const PASTELS_DARK = [
+  "linear-gradient(135deg, rgba(234,88,12,0.20) 0%, rgba(251,146,60,0.16) 60%, rgba(254,215,170,0.07) 100%)", // oranye hangat
+  "linear-gradient(135deg, rgba(79,70,229,0.22) 0%, rgba(129,140,248,0.16) 60%, rgba(165,180,252,0.07) 100%)", // indigo
+  "linear-gradient(135deg, rgba(22,163,74,0.20) 0%, rgba(74,222,128,0.16) 60%, rgba(187,247,208,0.07) 100%)", // hijau
+  "linear-gradient(135deg, rgba(219,39,119,0.20) 0%, rgba(244,114,182,0.16) 60%, rgba(251,207,232,0.07) 100%)", // pink
+  "linear-gradient(135deg, rgba(124,58,237,0.20) 0%, rgba(167,139,250,0.16) 60%, rgba(196,181,253,0.07) 100%)", // violet
+  "linear-gradient(135deg, rgba(8,145,178,0.20) 0%, rgba(34,211,238,0.16) 60%, rgba(165,243,252,0.07) 100%)", // cyan
+] as const
+
 function hashString(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
@@ -61,4 +73,9 @@ function hashString(s: string): number {
 /** Gradasi pastel stabil untuk seed (id item / kategori) — anti hydration mismatch. */
 export function pastelFor(seed: string): string {
   return PASTELS[hashString(seed) % PASTELS.length]
+}
+
+/** Gradasi pastel versi mode gelap — seed yang sama, hue sama, tingkat redup. */
+export function pastelDarkFor(seed: string): string {
+  return PASTELS_DARK[hashString(seed) % PASTELS_DARK.length]
 }

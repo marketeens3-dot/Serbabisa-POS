@@ -104,7 +104,7 @@ export function StatCard({
                 truncate membuat "Rata-rata transaksi" terpotong jadi "Rata-rata t…". */}
             <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 line-clamp-2 leading-snug">{label}</p>
             {loading ? (
-              <Skeleton className="h-7 w-28 sm:h-8 sm:w-32 mt-2 bg-white/60" />
+              <Skeleton className="h-7 w-28 sm:h-8 sm:w-32 mt-2 bg-white/60 dark:bg-white/10" />
             ) : (
               <p className={cn("text-[1.65rem] lg:text-3xl font-extrabold tracking-tight mt-1.5 tabular leading-none", t.value)}>
                 {value}
@@ -210,8 +210,12 @@ export function TransactionStatusBadge({ status }: { status: string }) {
         Direfund
       </Badge>
     );
+  // Mode gelap: soft tint agar selaras badge status lain (light tetap solid destructive).
   return (
-    <Badge variant="destructive">
+    <Badge
+      variant="destructive"
+      className="dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25 dark:hover:bg-red-500/15 dark:shadow-none"
+    >
       <BadgeDot />
       Dibatalkan
     </Badge>
@@ -227,8 +231,12 @@ export function UserStatusBadge({ status }: { status: string }) {
       </Badge>
     );
   if (status === "SUSPENDED")
+    // Mode gelap: soft tint (light tetap solid destructive).
     return (
-      <Badge variant="destructive">
+      <Badge
+        variant="destructive"
+        className="dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25 dark:hover:bg-red-500/15 dark:shadow-none"
+      >
         <BadgeDot />
         Ditangguhkan
       </Badge>
@@ -468,7 +476,7 @@ export function DesignStatCard({
         )}
 
         {loading ? (
-          <Skeleton className={cn("h-9 w-28 mt-3 bg-white/60", cornerEmoji && "mr-10")} />
+          <Skeleton className={cn("h-9 w-28 mt-3 bg-white/60 dark:bg-white/10", cornerEmoji && "mr-10")} />
         ) : (
           <p className={cn("text-[2rem] sm:text-4xl font-extrabold tracking-tight mt-2.5 tabular leading-none", cornerEmoji && "mr-9 sm:mr-12", valueClass)}>
             {value}

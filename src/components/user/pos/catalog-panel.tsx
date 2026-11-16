@@ -14,7 +14,8 @@ import { useApi, useDebounced, useResetOnKeyChange } from "@/hooks/use-api";
 import { api } from "@/lib/api-client";
 import { formatIDR, formatQty } from "@/lib/format";
 import { ShortcutHints } from "@/components/user/pos/shortcut-hints";
-import { itemEmoji, categoryEmoji, pastelFor } from "@/lib/catalog-visual";
+import { itemEmoji, categoryEmoji } from "@/lib/catalog-visual";
+import { usePastelFor } from "@/lib/use-pastel";
 import { useApp } from "@/components/app/app-context";
 import type { CatalogItemDTO, CategoryDTO, Paginated } from "@/lib/types";
 
@@ -52,6 +53,7 @@ export function CatalogPanel({
   searchInputRef: React.RefObject<HTMLInputElement | null>
   onAdd: (item: CatalogItemDTO, qty?: number) => void
 }) {
+  const pastel = usePastelFor()
   const [search, setSearch] = useState("")
   const [type, setType] = useState<TypeFilter>("ALL")
   const [categoryId, setCategoryId] = useState<string>("ALL")
@@ -294,7 +296,7 @@ export function CatalogPanel({
               >
                 <span
                   className="relative size-9 rounded-full overflow-hidden flex items-center justify-center text-lg shrink-0 ring-1 ring-inset ring-black/[0.04]"
-                  style={{ background: pastelFor(item.id) }}
+                  style={{ background: pastel(item.id) }}
                   aria-hidden="true"
                 >
                   {item.imageUrl ? (
@@ -508,7 +510,7 @@ export function CatalogPanel({
                     "ring-1 ring-inset ring-black/[0.04]",
                     outOfStock && "grayscale"
                   )}
-                  style={{ background: pastelFor(item.id) }}
+                  style={{ background: pastel(item.id) }}
                   aria-hidden="true"
                 >
                   {item.imageUrl ? (

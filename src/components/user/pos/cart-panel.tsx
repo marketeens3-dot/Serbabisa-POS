@@ -17,7 +17,8 @@ import { useApi } from "@/hooks/use-api";
 import { api, ApiClientError } from "@/lib/api-client";
 import { formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { formatPhoneDisplay } from "@/lib/phone";
-import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
+import { itemEmoji } from "@/lib/catalog-visual";
+import { usePastelFor } from "@/lib/use-pastel";
 import { ParkedCartsControls, type ParkedCart } from "@/components/user/pos/parked-carts";
 import { ParkedCartTip } from "@/components/user/pos/parked-cart-tip";
 import { lineDiscount, lineGross, effectiveUnitPrice, type CartLine } from "@/components/user/pos/cart-math";
@@ -90,6 +91,7 @@ export function CartPanel({
       jangan menghalangi katalog yang menjadi fokus utama kasir di ponsel. */
   mobileSheet?: boolean
 }) {
+  const pastel = usePastelFor()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [newCustomerOpen, setNewCustomerOpen] = useState(false)
   // Sheet mobile: default TERTUTUP — hanya strip header ringan menempel di
@@ -343,7 +345,7 @@ export function CartPanel({
                   <div className="flex items-center gap-2">
                     <span
                       className="relative size-9 rounded-lg overflow-hidden flex items-center justify-center text-base shrink-0 ring-1 ring-inset ring-black/[0.04]"
-                      style={{ background: pastelFor(line.item.id) }}
+                      style={{ background: pastel(line.item.id) }}
                       aria-hidden="true"
                     >
                       {line.item.imageUrl ? (

@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { api, ApiClientError } from "@/lib/api-client";
-import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
+import { itemEmoji } from "@/lib/catalog-visual";
+import { usePastelFor } from "@/lib/use-pastel";
 import type { CatalogItemDTO, CategoryDTO } from "@/lib/types";
 
 const formSchema = z.object({
@@ -56,6 +57,7 @@ export function CatalogItemFormDialog({
   categories: CategoryDTO[]
   onSaved: () => void
 }) {
+  const pastel = usePastelFor()
   const isProduct = type === "PRODUCT"
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -265,7 +267,7 @@ export function CatalogItemFormDialog({
             <div className="flex items-start gap-3.5 rounded-lg border p-3.5">
               <div
                 className="relative size-20 rounded-xl overflow-hidden shrink-0 ring-1 ring-inset ring-border/60 flex items-center justify-center text-3xl"
-                style={{ background: pastelFor(item?.id ?? "new") }}
+                style={{ background: pastel(item?.id ?? "new") }}
               >
                 {previewUrl ? (
                   <img src={previewUrl} alt="Gambar produk" className="absolute inset-0 size-full object-cover" loading="lazy" decoding="async" />

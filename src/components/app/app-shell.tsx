@@ -362,7 +362,7 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
                   kapsul rounded — konsisten di desktop & mobile. */}
               <div
                 className={cn(
-                  "flex items-center rounded-2xl bg-card shadow-sm ring-1 ring-black/[0.03] min-w-0 max-w-[75%]",
+                  "flex items-center rounded-2xl bg-card shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.06] min-w-0 max-w-[75%]",
                   showNavDrawer ? "gap-0.5 pl-1 pr-4 py-1" : "pl-4 pr-4 py-1.5"
                 )}
               >
@@ -589,9 +589,10 @@ function SidebarNavContent({
 
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
-      {/* Blob dekoratif lembut ala desain (murni visual) */}
-      <div className="pointer-events-none absolute -top-20 -left-16 size-52 rounded-full bg-white/70 blur-2xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-16 -right-14 size-56 rounded-full bg-blue-300/40 blur-2xl" aria-hidden="true" />
+      {/* Blob dekoratif lembut ala desain (murni visual) — di mode gelap
+          diredupkan agar tidak menyilaukan di atas panel navy. */}
+      <div className="pointer-events-none absolute -top-20 -left-16 size-52 rounded-full bg-white/70 dark:bg-white/10 blur-2xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-16 -right-14 size-56 rounded-full bg-blue-300/40 dark:bg-blue-500/10 blur-2xl" aria-hidden="true" />
 
       {/* Logo + nama produk */}
       <div className="relative flex items-center gap-3 px-5 pt-6 pb-4 shrink-0">
@@ -628,7 +629,7 @@ function SidebarNavContent({
                   "sb-wiggle relative w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all",
                   active
                     ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold shadow-lg shadow-blue-500/30"
-                    : "text-foreground/90 hover:bg-white/80 active:bg-white"
+                    : "text-foreground/90 hover:bg-white/80 active:bg-white dark:hover:bg-white/10 dark:active:bg-white/15"
                 )}
               >
                 <span
@@ -658,7 +659,7 @@ function SidebarNavContent({
 
       {/* Kartu profil + keluar */}
       <div className="relative px-3 pb-4 pt-1 shrink-0">
-        <div className="flex items-center gap-3 rounded-2xl bg-card/90 ring-1 ring-black/[0.04] shadow-sm px-3 py-2.5">
+        <div className="flex items-center gap-3 rounded-2xl bg-card/90 ring-1 ring-black/[0.04] dark:ring-white/[0.08] shadow-sm px-3 py-2.5">
           <div className="size-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0" aria-hidden="true">
             {user.fullName.slice(0, 1).toUpperCase()}
           </div>
@@ -668,7 +669,7 @@ function SidebarNavContent({
           </div>
           <button
             onClick={onLogout}
-            className="p-2 rounded-xl ring-1 ring-black/[0.05] bg-white text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            className="p-2 rounded-xl ring-1 ring-black/[0.05] dark:ring-white/10 bg-white dark:bg-white/10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             aria-label="Keluar dari aplikasi"
             title="Keluar"
           >
