@@ -47,7 +47,7 @@ export async function GET() {
         take: LIMIT,
         select: {
           id: true, type: true, name: true, sku: true, barcode: true, categoryId: true,
-          costPrice: true, sellingPrice: true, stockQty: true, minStockQty: true,
+          imageUrl: true, costPrice: true, sellingPrice: true, stockQty: true, minStockQty: true,
           unit: true, isActive: true, updatedAt: true,
           category: { select: { name: true } },
         },

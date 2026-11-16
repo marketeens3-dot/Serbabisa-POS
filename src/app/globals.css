@@ -202,6 +202,87 @@
 .sb-fade-in {
   animation: sb-fade-in 0.18s ease-out both;
 }
+/* ---------- FUN MODE — micro-interactions playful, tetap ringan ----------
+   Semua animasi fun hanya jalan saat `motion-safe` (pengguna gerak-minim
+   otomatis mendapat versi statis — dihormati penuh di blok media query). */
+
+/* Konfeti: potongan jatuh sambil berputar. Posisi, warna, rotasi, dan durasi
+   dikontrol via CSS custom properties yang di-set inline per potongan. */
+@keyframes sb-confetti-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg) scale(0.6);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--sb-drift, 0px), 108vh, 0) rotate(var(--sb-spin, 540deg)) scale(1);
+    opacity: 0.9;
+  }
+}
+.sb-confetti-piece {
+  position: absolute;
+  top: 0;
+  animation: sb-confetti-fall var(--sb-duration, 2.4s) cubic-bezier(0.3, 0.4, 0.6, 1) var(--sb-delay, 0s) forwards;
+  will-change: transform, opacity;
+}
+
+/* Cek sukses: masuk dengan lompatan elastis + ring ping sekali. */
+@keyframes sb-pop-in {
+  0% { transform: scale(0.3) rotate(-14deg); opacity: 0; }
+  55% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+  75% { transform: scale(0.94) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.sb-pop-in {
+  animation: sb-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sb-ring-ping {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.sb-ring-ping {
+  animation: sb-ring-ping 0.9s ease-out 0.25s both;
+}
+
+/* Emoji / maskot melayang lembut naik-turun (dekorasi pasif). */
+@keyframes sb-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(3deg); }
+}
+.sb-float {
+  animation: sb-float 3.2s ease-in-out infinite;
+}
+
+/* Ikon goyang playful saat hover (dipanggil via group-hover / hover). */
+@keyframes sb-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-9deg) scale(1.08); }
+  55% { transform: rotate(8deg) scale(1.08); }
+  80% { transform: rotate(-4deg); }
+}
+.sb-wiggle:hover .sb-wiggle-target,
+.group:hover .sb-wiggle-target {
+  animation: sb-wiggle 0.5s ease-in-out;
+}
+
+/* Teks gradien brand-bisa — untuk kata kunci di heading. */
+.sb-gradient-text {
+  background: linear-gradient(100deg, oklch(0.623 0.214 259.9), oklch(0.71 0.143 215.2), oklch(0.596 0.145 163.2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Chip "spirit" harian — latar gradien pelangi lembut dengan peluru kenangan. */
+.sb-fun-chip {
+  background: linear-gradient(100deg, oklch(0.95 0.05 259.9), oklch(0.96 0.04 200), oklch(0.95 0.06 320));
+}
+.dark .sb-fun-chip {
+  background: linear-gradient(100deg, oklch(0.32 0.06 259.9), oklch(0.3 0.05 200), oklch(0.31 0.06 320));
+}
+
 /* Hormati preferensi gerak-minim (aksesibilitas / perangkat hemat): tanpa animasi. */
 @media (prefers-reduced-motion: reduce) {
   .sb-fade-in { animation: none; }
@@ -209,6 +290,12 @@
   .sb-pop { animation: none; }
   .sb-added-chip { animation: none; opacity: 1; }
   .sb-press-fill { animation: none; }
+  .sb-confetti-piece { animation: none; opacity: 0; }
+  .sb-pop-in { animation: none; }
+  .sb-ring-ping { animation: none; opacity: 0; }
+  .sb-float { animation: none; }
+  .sb-wiggle:hover .sb-wiggle-target,
+  .group:hover .sb-wiggle-target { animation: none; }
 }
 
 /* Skeleton shimmer */

@@ -13,6 +13,9 @@ export type AppCtx = {
   stockAlertCount: number;
   /** Ambil ulang hitungan stok menipis (dipanggil setelah mutasi stok). */
   refreshStockAlerts: () => void;
+  /** Buka drawer navigasi (POS mobile tak punya hamburger di topbar —
+      tombol "Menu" di bar bawah keranjang yang memanggil ini). */
+  openNavDrawer: () => void;
 };
 
 export const AppContext = createContext<AppCtx | null>(null);

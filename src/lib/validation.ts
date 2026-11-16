@@ -178,7 +178,7 @@ export const checkoutSchema = z.object({
   // persen ini (nilai discountAmount dari client DIABAIKAN saat percent > 0).
   discountPercent: percentField.default(0),
   taxAmount: moneyField.default(0),
-  paymentMethod: enumField(['CASH', 'TRANSFER', 'QRIS', 'OTHER'] as const, 'Metode pembayaran tidak valid'),
+  paymentMethod: enumField(['CASH', 'TRANSFER', 'QRIS', 'OTHER', 'TEMPO'] as const, 'Metode pembayaran tidak valid'),
   paidAmount: z
     .number({ message: 'Jumlah bayar harus berupa angka' })
     .int('Jumlah bayar harus bilangan bulat rupiah')
@@ -186,6 +186,21 @@ export const checkoutSchema = z.object({
     .max(1_000_000_000_000, 'Jumlah bayar terlalu besar'),
   notes: z.string().trim().max(500, 'Catatan terlalu panjang').nullish(),
   idempotencyKey: z.union([z.string().min(8).max(64), z.null()]).optional(),
+  // ---------- INTEGRASI FINANS (Tier 1 + 2) ----------
+  // Penjualan untuk proyek/RAB → realisasi otomatis per item (source SALE).
+  projectId: z.union([z.string().min(1), z.null()]).optional(),
+  // Voucher promo: server memvalidasi kode & menghitung diskonnya sendiri.
+  voucherCode: z
+    .union([z.string().trim().min(2).max(30), z.null()])
+    .optional()
+    .transform((v) => (v == null || v === '' ? null : v.toUpperCase())),
+  // Jual tempo (TEMPO): jatuh tempo piutang dalam N hari (default 30).
+  dueDays: z
+    .number({ message: 'Jatuh tempo harus berupa angka' })
+    .int('Jatuh tempo harus bilangan bulat hari')
+    .min(1, 'Jatuh tempo minimal 1 hari')
+    .max(365, 'Jatuh tempo maksimal 365 hari')
+    .optional(),
   /**
    * Total yang benar-benar dibayar pelanggan di toko, diisi HANYA oleh klien
    * native yang mencatat transaksi saat offline lalu mengirimkannya nanti.
@@ -285,6 +300,176 @@ export const closeCashSessionSchema = z.object({
   notes: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
 })
 
+// ---------- FINANS & OPERASIONAL (Tier 1 + 2) ----------
+// ---------- RAB ----------
+export const projectSchema = z.object({
+  name: nameField,
+  // Kosong → server generate otomatis (RAB-YYYY-NNN).
+  code: z
+    .union([z.string().trim().max(FIELD_LIMITS.code, 'Kode terlalu panjang'), z.literal(''), z.null()])
+    .optional()
+    .transform((v) => (v == null || v === '' ? undefined : v)),
+  customerId: z.union([z.string().min(1), z.null()]).optional(),
+  description: z.string().trim().max(FIELD_LIMITS.description, 'Deskripsi terlalu panjang').nullish(),
+  status: enumField(['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const, 'Status proyek tidak valid').default('PLANNED'),
+  startDate: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
+  endDate: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
+})
+
+export const projectUpdateSchema = projectSchema.partial().extend({
+  status: enumField(['PLANNED', 'ACTIVE', 'COMPLETED', 'CANCELLED'] as const, 'Status proyek tidak valid').optional(),
+})
+
+export const rabItemSchema = z.object({
+  name: nameField,
+  quantity: qtyField.refine((v) => v > 0, 'Jumlah harus lebih dari 0'),
+  unit: z.string().trim().max(FIELD_LIMITS.unit, 'Satuan terlalu panjang').default('pcs'),
+  unitPrice: moneyField,
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+})
+
+export const rabRealizationSchema = z.object({
+  description: nameField,
+  quantity: qtyField.default(1),
+  amount: moneyField,
+  // Opsional: tautkan realisasi ke item anggaran tertentu (progres per item).
+  rabItemId: z.union([z.string().min(1), z.null()]).optional(),
+})
+
+// ---------- CASHFLOW ----------
+export const cashflowSchema = z.object({
+  direction: enumField(['IN', 'OUT'] as const, 'Arah kas tidak valid'),
+  category: z.string().trim().min(2, 'Kategori minimal 2 karakter').max(FIELD_LIMITS.category, 'Kategori terlalu panjang'),
+  amount: moneyField.refine((v) => v > 0, 'Nominal harus lebih dari 0'),
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+  // Tanggal kejadian (ISO datetime). Kosong → sekarang.
+  entryDate: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
+})
+
+export const cashflowUpdateSchema = cashflowSchema.partial().refine(
+  (v) => Object.keys(v).length > 0,
+  'Tidak ada perubahan'
+)
+
+// ---------- SUPPLIER ----------
+export const supplierSchema = z.object({
+  name: nameField,
+  phone: phoneField,
+  address: z.string().trim().max(FIELD_LIMITS.address, 'Alamat terlalu panjang').nullish(),
+  notes: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+})
+
+export const supplierUpdateSchema = supplierSchema.partial()
+
+// ---------- PEMBELIAN (PO) ----------
+export const purchaseCreateSchema = z.object({
+  supplierId: z.string().min(1, 'Supplier wajib dipilih'),
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+  // DRAFT = simpan dulu (belum dikirim ke supplier); ORDERED = langsung diorder.
+  submit: z.boolean().default(false),
+  items: z
+    .array(
+      z.object({
+        catalogItemId: z.string().min(1, 'Item tidak valid'),
+        quantity: qtyField.refine((v) => v > 0, 'Jumlah harus lebih dari 0'),
+        unitCost: moneyField,
+      })
+    )
+    .min(1, 'Minimal 1 item pembelian')
+    .max(MAX_TRANSACTION_ITEMS, `Maksimal ${MAX_TRANSACTION_ITEMS} item per PO`),
+})
+
+export const purchaseReceiveSchema = z.object({
+  // CASH = bayar tunai saat terima (auto catat cashflow OUT);
+  // TEMPO = hutang supplier (auto buat Debt PAYABLE).
+  paymentMethod: enumField(['CASH', 'TRANSFER', 'QRIS', 'OTHER', 'TEMPO'] as const, 'Metode pembayaran tidak valid'),
+  dueDays: z
+    .number({ message: 'Jatuh tempo harus berupa angka' })
+    .int('Jatuh tempo harus bilangan bulat hari')
+    .min(1, 'Jatuh tempo minimal 1 hari')
+    .max(365, 'Jatuh tempo maksimal 365 hari')
+    .optional(),
+})
+
+// ---------- HUTANG PIUTANG ----------
+export const debtManualSchema = z.object({
+  type: enumField(['RECEIVABLE', 'PAYABLE'] as const, 'Jenis hutang/piutang tidak valid'),
+  amount: moneyField.refine((v) => v > 0, 'Nominal harus lebih dari 0'),
+  customerId: z.union([z.string().min(1), z.null()]).optional(),
+  supplierId: z.union([z.string().min(1), z.null()]).optional(),
+  dueDate: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+})
+
+export const debtPaymentSchema = z.object({
+  amount: moneyField.refine((v) => v > 0, 'Nominal harus lebih dari 0'),
+  method: enumField(['CASH', 'TRANSFER', 'QRIS', 'OTHER'] as const, 'Metode pembayaran tidak valid').default('CASH'),
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+})
+
+// ---------- STOK OPNAME ----------
+export const stockOpnameSchema = z.object({
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+  items: z
+    .array(
+      z.object({
+        catalogItemId: z.string().min(1, 'Item tidak valid'),
+        physicalQty: qtyField,
+      })
+    )
+    .min(1, 'Pilih minimal 1 produk untuk dihitung')
+    .max(500, 'Maksimal 500 produk per opname'),
+})
+
+// ---------- VOUCHER ----------
+// Base tanpa object-refine agar .partial() valid di Zod 4 (refine tidak boleh
+// ikut ke versi update).
+const voucherBaseSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(3, 'Kode voucher minimal 3 karakter')
+    .max(30, 'Kode voucher maksimal 30 karakter')
+    .regex(/^[A-Za-z0-9_-]+$/, 'Kode hanya boleh huruf, angka, - dan _')
+    .transform((v) => v.toUpperCase()),
+  type: enumField(['PERCENT', 'FIXED'] as const, 'Jenis voucher tidak valid'),
+  value: moneyField.refine((v) => v > 0, 'Nilai voucher harus lebih dari 0'),
+  minPurchase: moneyField.default(0),
+  maxDiscount: moneyField.nullish(),
+  usageLimit: z
+    .number({ message: 'Batas pemakaian harus berupa angka' })
+    .int('Batas pemakaian harus bilangan bulat')
+    .min(1, 'Batas pemakaian minimal 1')
+    .max(1_000_000, 'Batas pemakaian terlalu besar')
+    .nullish(),
+  isActive: z.boolean().default(true),
+  expiresAt: z.union([z.string().datetime({ offset: true }), z.null()]).optional(),
+})
+
+export const voucherSchema = voucherBaseSchema.refine((v) => v.type !== 'PERCENT' || v.value <= 100, {
+  message: 'Persen voucher maksimal 100',
+  path: ['value'],
+})
+
+export const voucherUpdateSchema = voucherBaseSchema.partial()
+
+export const voucherValidateSchema = z.object({
+  code: z.string().trim().min(1, 'Kode voucher wajib diisi').max(30, 'Kode terlalu panjang').transform((v) => v.toUpperCase()),
+  subtotal: moneyField,
+})
+
+// ---------- LOYALTY POIN ----------
+export const pointsAdjustSchema = z.object({
+  // Bertanda: positif = tambah poin, negatif = kurangi (redeem/koreksi). 0 ditolak.
+  points: z
+    .number({ message: 'Poin harus berupa angka' })
+    .int('Poin harus bilangan bulat')
+    .refine((v) => v !== 0, 'Poin tidak boleh 0')
+    .refine((v) => Math.abs(v) <= 1_000_000, 'Poin terlalu besar'),
+  type: enumField(['REDEEM', 'ADJUST'] as const, 'Jenis penyesuaian tidak valid').default('REDEEM'),
+  note: z.string().trim().max(FIELD_LIMITS.notes, 'Catatan terlalu panjang').nullish(),
+})
+
 // ---------- TYPE INFERENCE ----------
 export type LoginInput = z.infer<typeof loginSchema>
 export type CreateUserInput = z.infer<typeof createUserSchema>
@@ -295,3 +480,15 @@ export type RefundInput = z.infer<typeof refundSchema>
 export type StockAdjustInput = z.infer<typeof stockAdjustSchema>
 export type SettingsInput = z.infer<typeof settingsSchema>
 export type InvoiceTemplateInput = z.infer<typeof invoiceTemplateSchema>
+export type ProjectInput = z.infer<typeof projectSchema>
+export type RabItemInput = z.infer<typeof rabItemSchema>
+export type RabRealizationInput = z.infer<typeof rabRealizationSchema>
+export type CashflowInput = z.infer<typeof cashflowSchema>
+export type SupplierInput = z.infer<typeof supplierSchema>
+export type PurchaseCreateInput = z.infer<typeof purchaseCreateSchema>
+export type PurchaseReceiveInput = z.infer<typeof purchaseReceiveSchema>
+export type DebtManualInput = z.infer<typeof debtManualSchema>
+export type DebtPaymentInput = z.infer<typeof debtPaymentSchema>
+export type StockOpnameInput = z.infer<typeof stockOpnameSchema>
+export type VoucherInput = z.infer<typeof voucherSchema>
+export type PointsAdjustInput = z.infer<typeof pointsAdjustSchema>

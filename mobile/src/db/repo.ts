@@ -26,6 +26,8 @@ export type Product = {
   barcode: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  /** URL gambar produk (WebP, diunggah dari web) — null bila tidak ada. */
+  imageUrl: string | null;
   sellingPrice: number;
   costPrice: number;
   stockQty: number;
@@ -95,7 +97,7 @@ export async function listProducts(f: ProductFilter): Promise<Product[]> {
   const limit = Math.min(f.limit ?? CONFIG.pageSize, 200);
   return db.getAllAsync<Product>(
     `SELECT id, tenantId, type, name, sku, barcode, categoryId, categoryName,
-            sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
+            imageUrl, sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
        FROM cache_product
       WHERE ${where.join(' AND ')}
       ORDER BY name COLLATE NOCASE ASC
@@ -109,7 +111,7 @@ export async function findByBarcode(tenantId: string, barcode: string): Promise<
   const db = await getDb();
   const row = await db.getFirstAsync<Product>(
     `SELECT id, tenantId, type, name, sku, barcode, categoryId, categoryName,
-            sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
+            imageUrl, sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
        FROM cache_product
       WHERE tenantId = ? AND barcode = ? AND isActive = 1
       LIMIT 1`,
@@ -122,7 +124,7 @@ export async function getProduct(tenantId: string, id: string): Promise<Product 
   const db = await getDb();
   const row = await db.getFirstAsync<Product>(
     `SELECT id, tenantId, type, name, sku, barcode, categoryId, categoryName,
-            sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
+            imageUrl, sellingPrice, costPrice, stockQty, minStockQty, unit, isActive
        FROM cache_product WHERE tenantId = ? AND id = ?`,
     [tenantId, id],
   );

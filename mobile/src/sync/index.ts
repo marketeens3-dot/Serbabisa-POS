@@ -262,18 +262,19 @@ async function writeBootstrap(data: {
     // PERNAH turun, sehingga penjualan dari perangkat lain tak akan terlihat.
     for (const p of data.products as Array<{
       id: string; type: string; name: string; sku: string | null; barcode: string | null;
-      categoryId: string | null; categoryName: string | null; costPrice: number;
-      sellingPrice: number; stockQty: number; minStockQty: number; unit: string;
-      isActive: boolean; tenantId: string;
+      categoryId: string | null; categoryName: string | null; imageUrl: string | null;
+      costPrice: number; sellingPrice: number; stockQty: number; minStockQty: number;
+      unit: string; isActive: boolean; tenantId: string;
     }>) {
       await db.runAsync(
         `INSERT INTO cache_product(id, tenantId, type, name, sku, barcode, categoryId, categoryName,
-                                   sellingPrice, costPrice, stockQty, minStockQty, unit, isActive, json, syncedAt)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   imageUrl, sellingPrice, costPrice, stockQty, minStockQty, unit, isActive, json, syncedAt)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            type = excluded.type, name = excluded.name, sku = excluded.sku,
            barcode = excluded.barcode, categoryId = excluded.categoryId,
-           categoryName = excluded.categoryName, sellingPrice = excluded.sellingPrice,
+           categoryName = excluded.categoryName, imageUrl = excluded.imageUrl,
+           sellingPrice = excluded.sellingPrice,
            costPrice = excluded.costPrice, stockQty = excluded.stockQty,
            minStockQty = excluded.minStockQty, unit = excluded.unit,
            isActive = excluded.isActive, json = excluded.json, syncedAt = excluded.syncedAt`,
@@ -286,6 +287,7 @@ async function writeBootstrap(data: {
           p.barcode,
           p.categoryId,
           p.categoryName,
+          p.imageUrl ?? null,
           p.sellingPrice,
           p.costPrice,
           p.stockQty,

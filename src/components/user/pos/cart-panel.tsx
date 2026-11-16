@@ -1,11 +1,12 @@
-// Panel keranjang: daftar item + qty, pilih pelanggan (command picker), diskon, total, tombol BAYAR.
+// Panel keranjang: daftar item + qty, pilih pelanggan (command picker), diskon,
+// total, tombol BAYAR. Mobile: dirender sebagai sheet melayang ala referensi
+// (handle di atas, tombol Bayar ada di bar bawah milik pos-view).
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronsUpDown, Minus, Plus, Pin, ShoppingCart, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowRight, Check, ChevronsUpDown, CreditCard, Minus, Plus, Pin, ShoppingCart, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +17,7 @@ import { useApi } from "@/hooks/use-api";
 import { api, ApiClientError } from "@/lib/api-client";
 import { formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { formatPhoneDisplay } from "@/lib/phone";
+import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
 import { ParkedCartsControls, type ParkedCart } from "@/components/user/pos/parked-carts";
 import { ParkedCartTip } from "@/components/user/pos/parked-cart-tip";
 import { lineDiscount, lineGross, effectiveUnitPrice, type CartLine } from "@/components/user/pos/cart-math";
@@ -101,14 +103,20 @@ export function CartPanel({
   const total = Math.max(0, netSubtotal - discount)
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg shadow-primary/5 flex flex-col max-h-[calc(100vh-6.5rem)]">
+    <div className="overflow-hidden rounded-t-3xl lg:rounded-xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/85 shadow-lg shadow-primary/5 flex flex-col max-h-[46vh] lg:max-h-[calc(100vh-6.5rem)]">
+      {/* Handle sheet — hanya mobile ala referensi */}
+      <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-muted-foreground/25 lg:hidden" aria-hidden="true" />
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b">
-        <ShoppingCart className="size-4.5 text-primary shrink-0" aria-hidden="true" />
-        <p className="font-semibold text-sm">Keranjang</p>
-        <Badge variant="secondary" className="tabular rounded-full px-2">
-          {cart.length} item
-        </Badge>
+        <span
+          className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"
+          aria-hidden="true"
+        >
+          <ShoppingCart className="size-4.5" />
+        </span>
+        <p className="font-semibold text-sm whitespace-nowrap">
+          Keranjang <span className="text-muted-foreground font-medium">({cart.length} item)</span>
+        </p>
         <div className="ml-auto flex items-center gap-1.5">
           <ParkedCartsControls
             carts={parkedCarts}
@@ -120,22 +128,27 @@ export function CartPanel({
         </div>
       </div>
 
-      {/* Tips parkir — sekali tampil, kontekstual saat keranjang berisi */}
-      {cart.length >= 2 && <ParkedCartTip />}
+      {/* Isi sheet — SATU area gulir (tips + daftar item + ringkasan): total
+          selalu terjangkau dengan scroll, sisanya terpotong rapi oleh
+          overflow-hidden — tidak pernah menimpa bar "Bayar Sekarang". */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {cart.length >= 2 && <ParkedCartTip />}
 
-      {/* Daftar item */}
-      <div className="flex-1 overflow-y-auto min-h-[120px] max-h-[45vh] px-3 py-2">
+        <div className="px-3 py-2">
         {!cart.length ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center px-4">
-            <div
-              className="size-12 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center mb-3"
-              aria-hidden="true"
-            >
-              <ShoppingCart className="size-5 text-primary" />
+          <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+            {/* Ilustrasi kosong ala referensi: keranjang + gelembung maskot */}
+            <div className="relative mb-3" aria-hidden="true">
+              <div className="size-16 rounded-full bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center">
+                <ShoppingCart className="size-7 text-muted-foreground/70" />
+              </div>
+              <div className="absolute -top-1.5 -right-2.5 size-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm shadow-md">
+                🧋
+              </div>
             </div>
-            <p className="text-sm font-semibold">Keranjang masih kosong</p>
-            <p className="text-xs text-muted-foreground mt-1.5 max-w-[220px]">
-              Pilih item dari katalog untuk mulai berjualan.
+            <p className="text-sm font-semibold">Belum ada pesanan</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-[240px]">
+              Yuk pilih produk terlebih dahulu!
             </p>
           </div>
         ) : (
@@ -149,6 +162,17 @@ export function CartPanel({
                    ponsel — kasir tak bisa memverifikasi item. */
                 <li key={line.item.id} className="py-2.5">
                   <div className="flex items-center gap-2">
+                    <span
+                      className="relative size-9 rounded-lg overflow-hidden flex items-center justify-center text-base shrink-0 ring-1 ring-inset ring-black/[0.04]"
+                      style={{ background: pastelFor(line.item.id) }}
+                      aria-hidden="true"
+                    >
+                      {line.item.imageUrl ? (
+                        <img src={line.item.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+                      ) : (
+                        itemEmoji(line.item.name, line.item.type)
+                      )}
+                    </span>
                     <p className="text-sm font-medium leading-tight truncate min-w-0 flex-1">
                       {line.item.name}
                     </p>
@@ -220,8 +244,8 @@ export function CartPanel({
         )}
       </div>
 
-      {/* Ringkasan + aksi */}
-      <div className="border-t p-4 space-y-3.5 bg-muted/30 rounded-b-xl">
+        {/* Ringkasan + aksi */}
+        <div className="border-t p-4 space-y-3.5 bg-muted/30">
         {/* Pelanggan */}
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">Pelanggan (opsional)</p>
@@ -295,7 +319,7 @@ export function CartPanel({
               <div
                 role="group"
                 aria-label="Satuan diskon"
-                className="inline-flex rounded-md border border-border/70 p-0.5 bg-muted/40"
+                className="inline-flex rounded-full border border-border/70 p-0.5 bg-muted/40"
               >
                 {(["rp", "pct"] as const).map((m) => (
                   <button
@@ -308,7 +332,7 @@ export function CartPanel({
                     }}
                     aria-pressed={discountMode === m}
                     className={cn(
-                      "rounded px-2 py-0.5 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                      "rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ring",
                       discountMode === m
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -317,6 +341,15 @@ export function CartPanel({
                     {m === "rp" ? "Rp" : "%"}
                   </button>
                 ))}
+                {/* "Tanpa" — aksi bersihkan diskon (sekalian lepas pin); gaya
+                    selalu netral agar tidak ganda-aktif dengan Rp saat diskon 0 */}
+                <button
+                  type="button"
+                  onClick={onClearDiscount}
+                  className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  Tanpa
+                </button>
               </div>
               {/* Tombol DISKON TETAP: sematkan nilai diskon agar otomatis
                   terpakai lagi di transaksi berikutnya (tersimpan per kasir). */}
@@ -421,25 +454,32 @@ export function CartPanel({
           </div>
         </div>
 
-        <Button
-          size="lg"
-          className="w-full h-12 text-base font-bold shadow-sm active:scale-[0.98]"
-          disabled={disabled || discount > netSubtotal || payLocked}
-          onClick={onCheckout}
-          title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
-          aria-describedby={payLocked ? "pay-locked-hint" : undefined}
-        >
-          Bayar — {formatIDR(total)}
-        </Button>
-        {payLocked ? (
-          <p id="pay-locked-hint" className="text-[11px] text-destructive text-center" role="alert">
-            Transaksi terkunci — mulai shift untuk menerima pembayaran.
-          </p>
-        ) : (
-          <p className="text-[11px] text-muted-foreground text-center">
-            Stok &amp; total akan divalidasi ulang oleh server saat pembayaran.
-          </p>
-        )}
+        {/* Tombol Bayar — desktop (mobile memakai bar "Bayar Sekarang" milik pos-view) */}
+        <div className="hidden lg:block">
+          <Button
+            size="lg"
+            className="w-full h-12 text-base font-bold rounded-full gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
+            disabled={disabled || discount > netSubtotal || payLocked}
+            onClick={onCheckout}
+            title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
+            aria-describedby={payLocked ? "pay-locked-hint" : undefined}
+            aria-label={`Bayar Sekarang — ${formatIDR(total)}`}
+          >
+            <CreditCard className="size-4.5" aria-hidden="true" />
+            Bayar Sekarang
+            <ArrowRight className="size-4.5" aria-hidden="true" />
+          </Button>
+          {payLocked ? (
+            <p id="pay-locked-hint" className="text-[11px] text-destructive text-center mt-2" role="alert">
+              Transaksi terkunci — mulai shift untuk menerima pembayaran.
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground text-center mt-2">
+              Stok &amp; total akan divalidasi ulang oleh server saat pembayaran.
+            </p>
+          )}
+        </div>
+        </div>
       </div>
 
       <NewCustomerDialog

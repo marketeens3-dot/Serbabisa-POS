@@ -74,8 +74,16 @@ export default function LoginScreen() {
         <div className="pointer-events-none absolute -top-28 -right-20 size-96 rounded-full bg-[#3878ff]/20 blur-3xl" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-32 -left-24 size-96 rounded-full bg-cyan-400/10 blur-3xl" aria-hidden="true" />
 
+        {/* Emoji melayang — nuansa "jualan apa saja" yang ramah & fun */}
+        <div className="pointer-events-none absolute inset-0 select-none" aria-hidden="true">
+          <span className="sb-float absolute top-[18%] right-[12%] text-3xl opacity-25 drop-shadow-lg" style={{ animationDelay: "0s" }}>🛍️</span>
+          <span className="sb-float absolute top-[42%] right-[38%] text-2xl opacity-20 drop-shadow-lg" style={{ animationDelay: "0.7s" }}>🧾</span>
+          <span className="sb-float absolute top-[63%] right-[16%] text-2xl opacity-25 drop-shadow-lg" style={{ animationDelay: "1.4s" }}>💳</span>
+          <span className="sb-float absolute top-[30%] right-[62%] text-xl opacity-15 drop-shadow-lg" style={{ animationDelay: "2.1s" }}>☕</span>
+        </div>
+
         <div className="relative flex items-center gap-3">
-          <img src="/logo-icon.png" alt="Logo Serbabisa" className="h-11 w-auto drop-shadow-lg" />
+          <img src="/logo-icon.png" alt="Logo Serbabisa" className="h-11 w-auto drop-shadow-lg sb-pop-in" />
           <div>
             <p className="font-semibold text-lg tracking-tight">
               Serba<span className="text-sky-400">bisa</span>
@@ -88,7 +96,7 @@ export default function LoginScreen() {
           <h1 className="text-3xl lg:text-4xl font-bold tracking-tight leading-tight">
             Satu aplikasi untuk
             <br />
-            semua urusan kasir.
+            <span className="sb-gradient-text">semua urusan kasir.</span>
           </h1>
           <p className="mt-4 text-zinc-300 max-w-md leading-relaxed">
             Kelola produk, jasa, pelanggan, dan transaksi. Nota bisa dicetak atau dikirim via WhatsApp —
@@ -123,7 +131,7 @@ export default function LoginScreen() {
           <div className="rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/80 shadow-lg shadow-primary/5 p-6 sm:p-8">
             <h2 className="text-2xl font-bold tracking-tight">Masuk ke akun Anda</h2>
             <p className="text-muted-foreground mt-1.5 text-sm">
-              Akun dibuat oleh Super Admin. Tidak ada pendaftaran publik.
+              Siap jualan hari ini? 💪 Akun dibuat oleh Super Admin — tidak ada pendaftaran publik.
             </p>
 
             <form onSubmit={handleSubmit} className="mt-7 space-y-5" noValidate>

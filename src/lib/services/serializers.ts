@@ -65,8 +65,10 @@ type ItemRow = {
   sku: string | null
   barcode: string | null
   description: string | null
+  imageUrl: string | null
   categoryId: string | null
   category?: { name: string } | null
+  costPrice: number
   sellingPrice: number
   discountAmount: number
   stockQty: number
@@ -84,8 +86,10 @@ export function toCatalogItemDTO(row: ItemRow): CatalogItemDTO {
     sku: row.sku,
     barcode: row.barcode,
     description: row.description,
+    imageUrl: row.imageUrl ?? null,
     categoryId: row.categoryId,
     categoryName: row.category?.name ?? null,
+    costPrice: row.costPrice,
     sellingPrice: row.sellingPrice,
     discountAmount: row.discountAmount ?? 0,
     stockQty: row.stockQty,
@@ -105,6 +109,7 @@ type CustomerRow = {
   address: string | null
   notes: string | null
   isActive: boolean
+  points?: number
   createdAt: Date
   _count?: { transactions: number }
   transactions?: { totalAmount: number; createdAt: Date }[]
@@ -120,6 +125,7 @@ export function toCustomerDTO(row: CustomerRow): CustomerDTO {
     address: row.address,
     notes: row.notes,
     isActive: row.isActive,
+    points: row.points ?? 0,
     transactionCount: row._count?.transactions ?? recent.length,
     totalSpent: recent.reduce((s, t) => s + t.totalAmount, 0),
     lastTransactionAt: recent[0]?.createdAt?.toISOString() ?? null,
@@ -180,6 +186,10 @@ type TxRow = {
   cashier?: { fullName: string } | null
   customerId: string | null
   customer?: { name: string; phone: string | null } | null
+  projectId?: string | null
+  project?: { name: string; code: string } | null
+  voucherCode?: string | null
+  voucherDiscount?: number
   items?: TxItemRow[]
 }
 
@@ -208,6 +218,10 @@ export function toTransactionDTO(row: TxRow): TransactionDTO {
     customerId: row.customerId,
     customerName: row.customer?.name ?? null,
     customerPhone: row.customer?.phone ?? null,
+    projectId: row.projectId ?? null,
+    projectName: row.project?.name ?? null,
+    voucherCode: row.voucherCode ?? null,
+    voucherDiscount: row.voucherDiscount ?? 0,
     items: row.items?.map(toTransactionItemDTO),
   }
 }

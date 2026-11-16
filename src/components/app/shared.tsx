@@ -73,6 +73,7 @@ export function StatCard({
   icon: Icon,
   tone = "default",
   loading,
+  wiggle,
 }: {
   label: string;
   value: string;
@@ -80,10 +81,16 @@ export function StatCard({
   icon: LucideIcon;
   tone?: "default" | "success" | "warning" | "danger";
   loading?: boolean;
+  wiggle?: boolean;
 }) {
   const t = STAT_TONES[tone];
   return (
-    <Card className="overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm">
+    <Card
+      className={cn(
+        "overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm",
+        wiggle && "sb-wiggle"
+      )}
+    >
       <div className={cn("h-[3px] bg-gradient-to-r motion-safe:transition-all", t.bar)} aria-hidden="true" />
       <CardContent className="p-4 lg:p-5">
         <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -102,12 +109,12 @@ export function StatCard({
           </div>
           <div
             className={cn(
-              "size-11 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-inset",
+              "size-11 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-inset transition-transform",
               t.icon
             )}
             aria-hidden="true"
           >
-            <Icon className="size-5" />
+            <Icon className={cn("size-5", wiggle && "sb-wiggle-target")} />
           </div>
         </div>
       </CardContent>
@@ -120,19 +127,28 @@ export function EmptyState({
   description,
   action,
   icon: Icon = Inbox,
+  emoji = "🫧",
 }: {
   title: string;
   description?: string;
   action?: React.ReactNode;
   icon?: LucideIcon;
+  /** Emoji kecil di pojok ikon — sentuhan fun saat data masih kosong. */
+  emoji?: string;
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 px-6 rounded-xl border border-dashed bg-muted/20">
-      <div
-        className="size-14 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center mb-4"
-        aria-hidden="true"
-      >
-        <Icon className="size-6 text-primary" />
+      <div className="relative" aria-hidden="true">
+        <div
+          className="size-14 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center mb-4"
+        >
+          <Icon className="size-6 text-primary" />
+        </div>
+        <span
+          className="sb-float absolute -top-2 -right-3 text-base leading-none drop-shadow-sm"
+        >
+          {emoji}
+        </span>
       </div>
       <p className="text-base font-semibold">{title}</p>
       {description && <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">{description}</p>}
@@ -245,36 +261,29 @@ export function PaymentMethodBadge({ method }: { method: string }) {
 }
 
 // Badge peringkat untuk daftar item terlaris (dashboard & laporan).
+// Top 3: medali 🥇🥈🥉 — playful namun tetap terbaca; sisanya angka polos.
+const RANK_MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+const RANK_TONES: Record<number, string> = {
+  1: "bg-amber-500/20 border border-amber-500/40",
+  2: "bg-muted border border-muted-foreground/25",
+  3: "bg-orange-700/15 border border-orange-700/30",
+};
+
 export function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) {
+  const medal = RANK_MEDALS[rank];
+  if (medal) {
     return (
       <span
-        className="size-6 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs font-bold tabular shrink-0"
-        aria-label="Peringkat 1"
+        className={cn(
+          "size-6 rounded-md flex items-center justify-center text-xs shrink-0 transition-transform hover:scale-125",
+          RANK_TONES[rank]
+        )}
+        aria-label={`Peringkat ${rank}`}
+        title={rank === 1 ? "Juaranya!" : `Peringkat ${rank}`}
       >
-        {rank}
+        {medal}
       </span>
-    )
-  }
-  if (rank === 2) {
-    return (
-      <span
-        className="size-6 rounded-md bg-muted border border-muted-foreground/25 text-muted-foreground flex items-center justify-center text-xs font-bold tabular shrink-0"
-        aria-label="Peringkat 2"
-      >
-        {rank}
-      </span>
-    )
-  }
-  if (rank === 3) {
-    return (
-      <span
-        className="size-6 rounded-md bg-orange-700/15 border border-orange-700/30 text-orange-700 dark:text-orange-400 flex items-center justify-center text-xs font-bold tabular shrink-0"
-        aria-label="Peringkat 3"
-      >
-        {rank}
-      </span>
-    )
+    );
   }
   return (
     <span
@@ -283,7 +292,7 @@ export function RankBadge({ rank }: { rank: number }) {
     >
       {rank}
     </span>
-  )
+  );
 }
 
 export function MoneyCell({ amount, className }: { amount: number; className?: string }) {

@@ -5,15 +5,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
+  BarChart3,
   ChartColumn,
+  ClipboardCheck,
+  Coins,
+  FolderKanban,
   FolderTree,
+  HandCoins,
   LayoutDashboard,
   LogOut,
   Menu,
-  Moon,
   Package,
   Printer,
   ReceiptText,
@@ -21,23 +24,17 @@ import {
   ScrollText,
   Settings,
   Store,
-  Sun,
-  User,
+  Ticket,
+  TrendingUp,
+  Truck,
   Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SyncIndicator from "./sync-indicator";
+import { ThemeToggle, UserMenu } from "./user-menu";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { AppContext, type AppCtx } from "@/components/app/app-context";
 import { api, ApiClientError } from "@/lib/api-client";
 import { useApi } from "@/hooks/use-api";
@@ -71,6 +68,15 @@ const CustomersView = dyn(() => import("@/components/user/customers-view"));
 const CustomerDetailView = dyn<{ customerId: string }>(() => import("@/components/user/customer-detail-view"));
 const TransactionsView = dyn(() => import("@/components/user/transactions-view"));
 const TransactionDetailView = dyn<{ transactionId: string }>(() => import("@/components/user/transaction-detail-view"));
+const ProjectsView = dyn(() => import("@/components/user/projects-view"));
+const ProjectDetailView = dyn<{ projectId: string }>(() => import("@/components/user/project-detail-view"));
+const CashflowView = dyn(() => import("@/components/user/cashflow-view"));
+const DebtsView = dyn(() => import("@/components/user/debts-view"));
+const PurchasesView = dyn(() => import("@/components/user/purchases-view"));
+const FinanceDashboardView = dyn(() => import("@/components/user/finance-dashboard-view"));
+const AnalyticsView = dyn(() => import("@/components/user/analytics-view"));
+const StockOpnameView = dyn(() => import("@/components/user/stock-opname-view"));
+const VouchersView = dyn(() => import("@/components/user/vouchers-view"));
 const InvoiceBuilderView = dyn(() => import("@/components/user/invoice-builder-view"));
 const ReportsView = dyn(() => import("@/components/user/reports-view"));
 const SettingsView = dyn(() => import("@/components/user/settings-view"));
@@ -92,6 +98,14 @@ const USER_NAV: NavItem[] = [
   { label: "Kategori", path: "/app/categories", icon: FolderTree },
   { label: "Pelanggan", path: "/app/customers", icon: Users },
   { label: "Transaksi", path: "/app/transactions", icon: ReceiptText },
+  { label: "Proyek RAB", path: "/app/projects", icon: FolderKanban },
+  { label: "Kas & Cashflow", path: "/app/cashflow", icon: Coins },
+  { label: "Hutang Piutang", path: "/app/debts", icon: HandCoins },
+  { label: "Pembelian", path: "/app/purchases", icon: Truck },
+  { label: "Stok Opname", path: "/app/stock-opname", icon: ClipboardCheck },
+  { label: "Voucher", path: "/app/vouchers", icon: Ticket },
+  { label: "Keuangan", path: "/app/finance", icon: TrendingUp },
+  { label: "Analitik", path: "/app/analytics", icon: BarChart3 },
   { label: "Nota", path: "/app/invoice-builder", icon: Printer },
   { label: "Laporan", path: "/app/reports", icon: ChartColumn },
   { label: "Pengaturan", path: "/app/settings", icon: Settings },
@@ -112,6 +126,14 @@ const VIEW_TITLES: Record<string, string> = {
   categories: "Kategori",
   customers: "Pelanggan",
   transactions: "Transaksi",
+  projects: "Proyek RAB",
+  cashflow: "Kas & Cashflow",
+  debts: "Hutang & Piutang",
+  purchases: "Pembelian",
+  "stock-opname": "Stok Opname",
+  vouchers: "Voucher & Promo",
+  finance: "Dashboard Keuangan",
+  analytics: "Analitik",
   "invoice-builder": "Nota",
   reports: "Laporan",
   settings: "Pengaturan",
@@ -146,7 +168,15 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
   const showNavDrawer = useIsBelowLg()
   const [user, setUser] = useState<SessionUserDTO>(initialUser)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const { path, segments } = useHashRoute()
+  const { path: realPath, segments: realSegments } = useHashRoute()
+  // Hydration-safe untuk DEEP-LINK (muat ulang dengan hash, mis. #/app/pos):
+  // server selalu merender path "/" (Dashboard), jadi selama hydrasi klien
+  // juga memakai "/" agar pohon cocok dengan HTML server — view asli baru
+  // dipasang setelah mount. Tanpa ini, muat langsung ke hash tertentu
+  // memicu hydration mismatch (id Radix & teks header bergeser).
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
+  const path = mounted ? realPath : "/"
+  const segments = mounted ? realSegments : []
 
   const navigate = useCallback((to: string) => {
     const clean = to.startsWith("/") ? to : `/${to}`
@@ -154,16 +184,20 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
   }, [])
 
   // Default & guard role — USER tidak bisa ke #/admin, SUPER_ADMIN tidak ke #/app.
+  // Effect memakai REAL PATH (bukan path efektif pra-mount) dan BERJALAN HANYA
+  // SETELAH mount: sebelum mount, useHashRoute masih memegang snapshot server
+  // ("/") — bertindak saat itu bisa mengalihkan deep-link #/app/pos keliru ke /app.
   useEffect(() => {
+    if (!mounted) return
     const defaultPath = user.role === "SUPER_ADMIN" ? "/admin" : "/app"
-    if (!path || path === "/") {
+    if (!realPath || realPath === "/") {
       navigate(defaultPath)
-    } else if (user.role === "USER" && path.startsWith("/admin")) {
+    } else if (user.role === "USER" && realPath.startsWith("/admin")) {
       navigate("/app")
-    } else if (user.role === "SUPER_ADMIN" && path.startsWith("/app")) {
+    } else if (user.role === "SUPER_ADMIN" && realPath.startsWith("/app")) {
       navigate("/admin")
     }
-  }, [path, user.role, navigate])
+  }, [mounted, realPath, user.role, navigate])
 
   const refreshUser = useCallback(async () => {
     try {
@@ -222,12 +256,16 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
     logout,
     stockAlertCount: stockAlerts?.count ?? 0,
     refreshStockAlerts,
+    openNavDrawer: () => setDrawerOpen(true),
   }), [user, refreshUser, navigate, logout, stockAlerts, refreshStockAlerts])
 
   const nav = user.role === "SUPER_ADMIN" ? ADMIN_NAV : USER_NAV
   const area = segments[0] ?? (user.role === "SUPER_ADMIN" ? "admin" : "app") // "app" | "admin"
   const section = segments[1] ?? ""
   const detailId = segments[2] ?? ""
+  // Mode POS: topbar standar disembunyikan di mobile (diganti header brand POS),
+  // bottom nav memakai varian 4 tujuan tanpa tombol Menu (Menu ada di bar keranjang).
+  const posMode = area === "app" && section === "pos"
 
   const title = useMemo(() => {
     if (!section) return area === "admin" ? "Dashboard Admin" : "Dashboard"
@@ -254,6 +292,22 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
           return detailId ? <CustomerDetailView customerId={detailId} /> : <CustomersView />
         case "transactions":
           return detailId ? <TransactionDetailView transactionId={detailId} /> : <TransactionsView />
+        case "projects":
+          return detailId ? <ProjectDetailView projectId={detailId} /> : <ProjectsView />
+        case "cashflow":
+          return <CashflowView />
+        case "debts":
+          return <DebtsView />
+        case "purchases":
+          return <PurchasesView />
+        case "stock-opname":
+          return <StockOpnameView />
+        case "vouchers":
+          return <VouchersView />
+        case "finance":
+          return <FinanceDashboardView />
+        case "analytics":
+          return <AnalyticsView />
         case "invoice-builder":
           return <InvoiceBuilderView />
         case "reports":
@@ -291,8 +345,12 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
           </aside>
 
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Topbar — kaca frosted: konten yang di-scroll ter-blur di baliknya */}
-            <header className="sticky top-0 z-30 flex items-center gap-2 sm:gap-3 h-14 lg:h-16 px-3 sm:px-5 border-b border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 no-print">
+            {/* Topbar — kaca frosted. Di POS mobile disembunyikan: header brand
+                ala referensi (logo + sapaan + avatar) dirender oleh POS itu sendiri. */}
+            <header className={cn(
+              "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 h-14 lg:h-16 px-3 sm:px-5 border-b border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 no-print",
+              posMode && "max-lg:hidden"
+            )}>
               {showNavDrawer && (
                 <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
                   <SheetTrigger asChild>
@@ -351,16 +409,17 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
           </div>
         </div>
 
-        {/* Bottom nav — ponsel & tablet (< lg). Tombol utama selalu terjangkau
-            jempol, tanpa buka drawer. Disembunyikan di POS (area kerja kasir
-            penuh — navigasi keluar via hamburger topbar). */}
-        {showNavDrawer && !(area === "app" && section === "pos") && (
+        {/* Bottom nav — ponsel & tablet (< lg). Di POS memakai varian 4 tujuan
+            ala referensi (Beranda/Laporan/Produk/Pengaturan) tanpa tombol Menu —
+            "Menu" pindah ke bar bawah keranjang. */}
+        {showNavDrawer && (
           <BottomNav
             path={path}
             navigate={navigate}
             onOpenMenu={() => setDrawerOpen(true)}
             isAdmin={user.role === "SUPER_ADMIN"}
             alertCount={stockAlerts?.count ?? 0}
+            posMode={posMode}
           />
         )}
       </div>
@@ -377,12 +436,15 @@ function BottomNav({
   onOpenMenu,
   isAdmin,
   alertCount,
+  posMode = false,
 }: {
   path: string
   navigate: (p: string) => void
   onOpenMenu: () => void
   isAdmin: boolean
   alertCount: number
+  /** Varian POS: 4 tujuan ala referensi & tanpa tombol Menu. */
+  posMode?: boolean
 }) {
   const items: { label: string; path: string; icon: LucideIcon; end?: boolean }[] = isAdmin
     ? [
@@ -391,12 +453,19 @@ function BottomNav({
         { label: "Toko", path: "/admin/tenants", icon: Store },
         { label: "Audit", path: "/admin/audit", icon: ScrollText },
       ]
-    : [
-        { label: "Beranda", path: "/app", icon: LayoutDashboard, end: true },
-        { label: "Kasir", path: "/app/pos", icon: ScanBarcode },
-        { label: "Transaksi", path: "/app/transactions", icon: ReceiptText },
-        { label: "Laporan", path: "/app/reports", icon: ChartColumn },
-      ]
+    : posMode
+      ? [
+          { label: "Beranda", path: "/app", icon: LayoutDashboard, end: true },
+          { label: "Laporan", path: "/app/reports", icon: ChartColumn },
+          { label: "Produk", path: "/app/products", icon: Package },
+          { label: "Pengaturan", path: "/app/settings", icon: Settings },
+        ]
+      : [
+          { label: "Beranda", path: "/app", icon: LayoutDashboard, end: true },
+          { label: "Kasir", path: "/app/pos", icon: ScanBarcode },
+          { label: "Transaksi", path: "/app/transactions", icon: ReceiptText },
+          { label: "Laporan", path: "/app/reports", icon: ChartColumn },
+        ]
 
   const isActive = (it: { path: string; end?: boolean }) =>
     it.end
@@ -409,7 +478,7 @@ function BottomNav({
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-[0_-8px_24px_-16px_rgb(0_0_0/0.18)] no-print"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-5 h-16 max-w-lg mx-auto">
+      <div className={cn("grid max-w-lg mx-auto h-16", posMode ? "grid-cols-4" : "grid-cols-5")}>
         {items.map((it) => {
           const active = isActive(it)
           return (
@@ -433,26 +502,28 @@ function BottomNav({
             </button>
           )
         })}
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          aria-label={alertCount > 0 ? `Buka menu navigasi lengkap — ${alertCount} produk stok menipis` : "Buka menu navigasi lengkap"}
-          aria-haspopup="dialog"
-          className="relative flex flex-col items-center justify-center gap-1 text-muted-foreground transition-transform active:scale-95 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-        >
-          <span className="relative">
-            <Menu className="size-5" aria-hidden="true" />
-            {alertCount > 0 && (
-              <span
-                className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9.5px] font-bold leading-none flex items-center justify-center tabular-nums ring-2 ring-background"
-                aria-hidden="true"
-              >
-                {alertCount > 99 ? "99+" : alertCount}
-              </span>
-            )}
-          </span>
-          <span className="text-[10.5px] leading-none font-medium">Menu</span>
-        </button>
+        {!posMode && (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            aria-label={alertCount > 0 ? `Buka menu navigasi lengkap — ${alertCount} produk stok menipis` : "Buka menu navigasi lengkap"}
+            aria-haspopup="dialog"
+            className="relative flex flex-col items-center justify-center gap-1 text-muted-foreground transition-transform active:scale-95 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <span className="relative">
+              <Menu className="size-5" aria-hidden="true" />
+              {alertCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9.5px] font-bold leading-none flex items-center justify-center tabular-nums ring-2 ring-background"
+                  aria-hidden="true"
+                >
+                  {alertCount > 99 ? "99+" : alertCount}
+                </span>
+              )}
+            </span>
+            <span className="text-[10.5px] leading-none font-medium">Menu</span>
+          </button>
+        )}
       </div>
     </nav>
   )
@@ -479,7 +550,10 @@ function SidebarContent({
     return path.startsWith(itemPath)
   }
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex flex-col h-full overflow-hidden">
+      {/* Hiasan lembut di dasar sidebar (non-interaktif, murni visual ala tema) */}
+      <div className="pointer-events-none absolute -bottom-10 -right-10 size-44 rounded-full bg-primary/15 blur-2xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute bottom-16 -left-14 size-32 rounded-full bg-sky-400/10 blur-2xl" aria-hidden="true" />
       <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
         <img src="/logo-icon.png" alt="Logo Serbabisa" className="h-8.5 w-auto drop-shadow" />
         <div className="min-w-0">
@@ -499,17 +573,14 @@ function SidebarContent({
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left relative group",
+                "sb-wiggle w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-left transition-colors",
                 active
-                  ? "bg-sidebar-accent text-white"
-                  : "text-zinc-400 hover:text-white hover:bg-sidebar-accent/60"
+                  ? "bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/25"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
               )}
               aria-current={active ? "page" : undefined}
             >
-              {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-primary" aria-hidden="true" />
-              )}
-              <item.icon className={cn("size-4.5 shrink-0", active ? "text-primary" : "")} aria-hidden="true" />
+              <item.icon className={cn("sb-wiggle-target size-4.5 shrink-0", active ? "text-white" : "")} aria-hidden="true" />
               <span className="truncate">{item.label}</span>
               {item.path === "/app/products" && alertCount > 0 && (
                 <span
@@ -547,60 +618,5 @@ function SidebarContent({
   )
 }
 
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-  // Hydration-safe tanpa setState-in-effect: snapshot server=false, client=true.
-  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      aria-label={theme === "dark" ? "Aktifkan mode terang" : "Aktifkan mode gelap"}
-      title="Ganti tema terang/gelap"
-    >
-      {mounted && theme === "dark" ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
-    </Button>
-  )
-}
-
-function UserMenu({
-  user,
-  onProfile,
-  onLogout,
-  isAdmin,
-}: {
-  user: SessionUserDTO
-  onProfile: () => void
-  onLogout: () => void
-  isAdmin: boolean
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="size-9 rounded-full p-0" aria-label="Menu akun">
-          <div className="size-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm">
-            {user.fullName.slice(0, 1).toUpperCase()}
-          </div>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>
-          <p className="text-sm font-medium truncate">{user.fullName}</p>
-          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {!isAdmin && (
-          <DropdownMenuItem onClick={onProfile}>
-            <User className="size-4 mr-2" />
-            Profil Saya
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={onLogout} className="text-destructive focus:text-destructive">
-          <LogOut className="size-4 mr-2" />
-          Keluar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
+/* ThemeToggle & UserMenu diekstrak ke ./user-menu — dipakai bersama
+   topbar desktop dan header mobile POS. */

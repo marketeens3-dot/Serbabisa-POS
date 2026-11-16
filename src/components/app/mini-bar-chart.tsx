@@ -14,20 +14,36 @@ export function MiniBarChart({
 }) {
   const max = Math.max(1, ...data.map((d) => d.total));
   const hasData = data.some((d) => d.total > 0);
+  // Hari terlaris minggu ini dapat mahkota 🏆 — playful namun informatif.
+  const bestIndex = hasData
+    ? data.reduce((best, d, i) => (d.total > data[best].total ? i : best), 0)
+    : -1;
   return (
     <div className={cn("w-full", className)} role="img" aria-label="Grafik batang penjualan harian">
       <div className="flex items-end gap-1.5 sm:gap-2.5 h-40 border-b border-border">
         {data.map((d, i) => {
           const pct = Math.max(2, Math.round((d.total / max) * 100))
+          const isBest = i === bestIndex && d.total > 0
           return (
             <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group min-w-0 h-full">
               <div className="relative w-full flex-1 min-h-0 flex items-end">
+                {isBest && (
+                  <span
+                    className="sb-float pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 text-sm leading-none mb-0.5"
+                    aria-label={`Hari terlaris: ${d.label}`}
+                    title={`Terlaris minggu ini — ${d.label}`}
+                  >
+                    🏆
+                  </span>
+                )}
                 <div
                   title={`${d.label} · ${formatIDR(d.total)} · ${d.count} transaksi`}
                   className={cn(
                     "w-full rounded-t-md transition-all duration-300",
                     d.total > 0
-                      ? "bg-gradient-to-t from-primary/55 to-primary group-hover:from-primary/80 group-hover:to-primary"
+                      ? isBest
+                        ? "bg-gradient-to-t from-amber-500/60 to-amber-400 group-hover:from-amber-500/80 group-hover:to-amber-300"
+                        : "bg-gradient-to-t from-primary/55 to-primary group-hover:from-primary/80 group-hover:to-primary"
                       : "bg-muted group-hover:bg-muted-foreground/20"
                   )}
                   style={{ height: `${pct}%` }}

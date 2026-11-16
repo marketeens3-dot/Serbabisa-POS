@@ -1,10 +1,12 @@
 // Layar sukses setelah checkout: detail pembayaran + Cetak Nota + Kirim WhatsApp + Transaksi Baru.
+// FUN MODE: konfeti + ikon cek elastis + pesan selamat acak — momen sukses dirayakan.
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Download, MessageCircle, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfettiBurst } from "@/components/app/confetti";
 import { InvoiceRenderer, type InvoiceStore } from "@/components/invoice/invoice-renderer";
 import { InvoiceJpgCapture, useInvoiceJpg } from "@/components/invoice/download-invoice";
 import { PrintableInvoice, usePrintInvoice } from "@/components/invoice/print-invoice";
@@ -20,6 +22,16 @@ const METHOD_LABELS: Record<string, string> = {
   OTHER: "Lainnya",
 };
 
+// Pesan selamat acak — layar sukses tidak monoton di setiap transaksi.
+const CHEERS = [
+  "Yeay, transaksi beres! 🎉",
+  "Kerja bagus, lanjutkan! 💪",
+  "Pembeli pulang bahagia 😄",
+  "Omzet naik terus! 📈",
+  "Mantap, jualan lancar! 🚀",
+  "Satu langkah lebih dekat ke target! 🎯",
+] as const;
+
 export function PosSuccess({
   transaction,
   config,
@@ -34,6 +46,9 @@ export function PosSuccess({
   const effectiveConfig = config ?? DEFAULT_INVOICE_CONFIG
   const printInvoice = usePrintInvoice(effectiveConfig.paperSize)
   const [sendingWa, setSendingWa] = useState(false)
+  // Pesan selamat dipilih sekali per transaksi (bukan tiap render) —
+  // komponen ini hanya dimuat client-side setelah aksi checkout, jadi aman.
+  const cheer = useMemo(() => CHEERS[Math.floor(Math.random() * CHEERS.length)], [])
   // Diskon per item (Σ diskon baris) — ditampilkan terpisah dari diskon transaksi.
   const itemDiscountTotal = (transaction.items ?? []).reduce((s, i) => s + (i.discountAmount ?? 0), 0)
   const invoiceStore: InvoiceStore = {
@@ -63,17 +78,24 @@ export function PosSuccess({
 
   return (
     <div className="max-w-5xl mx-auto">
+      {/* Perayaan konfeti — sekali jalan saat layar sukses muncul */}
+      <ConfettiBurst />
       <div className="grid lg:grid-cols-2 gap-6 items-start">
         {/* Kiri: konfirmasi sukses */}
         <div className="rounded-2xl border bg-card p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col items-center text-center">
-            <div
-              className="size-16 rounded-full bg-emerald-600/10 ring-1 ring-emerald-600/20 flex items-center justify-center mb-4"
-              aria-hidden="true"
-            >
-              <CheckCircle2 className="size-9 text-emerald-600 dark:text-emerald-400" />
+            <div className="relative mb-4" aria-hidden="true">
+              <span className="absolute inset-0 rounded-full bg-emerald-500/30 sb-ring-ping" />
+              <div
+                className="size-16 rounded-full bg-emerald-600/10 ring-1 ring-emerald-600/20 flex items-center justify-center sb-pop-in"
+              >
+                <CheckCircle2 className="size-9 text-emerald-600 dark:text-emerald-400" />
+              </div>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Pembayaran Berhasil</h1>
+            <p className="mt-1 text-sm font-semibold bg-gradient-to-r from-emerald-600 via-sky-500 to-primary bg-clip-text text-transparent">
+              {cheer}
+            </p>
             <p className="text-muted-foreground text-sm mt-1">
               Transaksi tersimpan &amp; stok telah diperbarui.
             </p>

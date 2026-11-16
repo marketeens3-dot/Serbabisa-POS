@@ -1,11 +1,11 @@
-// Panel katalog POS: pencarian (barcode scanner-friendly), filter jenis/kategori, grid item.
+// Panel katalog POS: pencarian (barcode scanner-friendly), filter jenis/kategori,
+// grid item dengan media pastel + emoji (mobile: kartu horizontal ala referensi).
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Flame, Package, Plus, Search, SearchX, Wrench, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ArrowRight, Flame, Info, Leaf, Plus, ScanBarcode, Search, SearchX, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QtyDialog } from "@/components/user/pos/qty-dialog";
 import { LongPressTip, dismissLongPressTip } from "@/components/user/pos/long-press-tip";
@@ -14,6 +14,8 @@ import { useApi, useDebounced, useResetOnKeyChange } from "@/hooks/use-api";
 import { api } from "@/lib/api-client";
 import { formatIDR, formatQty } from "@/lib/format";
 import { ShortcutHints } from "@/components/user/pos/shortcut-hints";
+import { itemEmoji, categoryEmoji, pastelFor } from "@/lib/catalog-visual";
+import { useApp } from "@/components/app/app-context";
 import type { CatalogItemDTO, CategoryDTO, Paginated } from "@/lib/types";
 
 type TypeFilter = "ALL" | "PRODUCT" | "SERVICE"
@@ -21,6 +23,27 @@ type TopSoldEntry = { item: CatalogItemDTO; soldQty: number }
 
 /** Tekan-tahan kartu 500 ms → dialog jumlah (bukan +1). */
 const LONG_PRESS_MS = 500
+
+/* Tip "Enter" sekali per perangkat — dibaca lewat useSyncExternalStore (bukan
+   state+effect) supaya bebas cascading render dan aman hydration: snapshot
+   server selalu false, client membaca localStorage setelah mount. */
+const TIP_ENTER_KEY = "sb-tip-enter"
+function subscribeTipChange(cb: () => void) {
+  const handler = () => cb()
+  window.addEventListener("storage", handler) // perubahan dari tab lain
+  window.addEventListener("sb-tip-change", handler) // perubahan di tab ini
+  return () => {
+    window.removeEventListener("storage", handler)
+    window.removeEventListener("sb-tip-change", handler)
+  }
+}
+function getTipEnterVisible(): boolean {
+  try {
+    return localStorage.getItem(TIP_ENTER_KEY) !== "1"
+  } catch {
+    return true // penyimpanan tak tersedia → tampilkan tanpa mengingat penutupan
+  }
+}
 
 export function CatalogPanel({
   searchInputRef,
@@ -33,6 +56,19 @@ export function CatalogPanel({
   const [type, setType] = useState<TypeFilter>("ALL")
   const [categoryId, setCategoryId] = useState<string>("ALL")
   const [page, setPage] = useState(1)
+  const { navigate } = useApp()
+
+  // Tip "Enter" ala referensi — sekali tampil per perangkat, bisa ditutup,
+  // dan hanya di tampilan default (tersembunyi saat sedang mencari).
+  const enterTipVisible = useSyncExternalStore(subscribeTipChange, getTipEnterVisible, () => false)
+  function dismissEnterTip() {
+    try {
+      localStorage.setItem(TIP_ENTER_KEY, "1")
+    } catch {
+      // abaikan — tip tetap ditutup untuk sesi ini
+    }
+    window.dispatchEvent(new Event("sb-tip-change"))
+  }
   // Akumulasi item dari semua halaman yang sudah dimuat (fold-on-arrival,
   // lihat komentar di bawah). Menggantikan pola lama "salin data lama saat
   // klik" yang ber-RACE: saat fetch berikutnya berjalan, data masih halaman
@@ -150,39 +186,83 @@ export function CatalogPanel({
 
   return (
     <div className="space-y-3">
-      {/* Bar pencarian */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
-        <Input
-          ref={searchInputRef}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={handleSearchKeyDown}
-          placeholder="Cari produk / jasa / barcode…"
-          className="pl-9 pr-9 h-11 text-base"
-          aria-label="Cari produk atau jasa"
-          autoFocus
-        />
-        {search && (
+      {/* Bar pencarian + tombol Scan (ala referensi) — scanner keyboard-wedge
+          mengetik ke kolom ini, jadi "Scan" cukup memfokuskan kolom pencarian. */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            ref={searchInputRef}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Cari produk / jasa / barcode…"
+            className="pl-9.5 pr-14 h-11 text-base rounded-full bg-card shadow-sm"
+            aria-label="Cari produk atau jasa"
+            autoFocus
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 size-7 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Bersihkan pencarian"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          ) : (
+            <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center rounded-md border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              Ctrl + K
+            </kbd>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => searchInputRef.current?.focus()}
+          className="h-11 rounded-full gap-1.5 px-4 border-primary/30 text-primary hover:bg-primary/5 shadow-sm shrink-0 font-semibold"
+          aria-label="Mulai scan barcode — fokus ke kolom pencarian"
+          title="Scanner barcode mengetik ke kolom pencarian — klik, lalu scan"
+        >
+          <ScanBarcode className="size-4" aria-hidden="true" />
+          Scan
+        </Button>
+      </div>
+
+      {/* Banner tip biru ala referensi — kontekstual, sekali per perangkat */}
+      {enterTipVisible && !search && (
+        <div
+          className="flex items-center gap-2.5 rounded-xl border border-sky-500/25 bg-sky-500/[0.08] px-3.5 py-2.5"
+          role="status"
+        >
+          <span
+            className="size-7 rounded-lg bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0"
+            aria-hidden="true"
+          >
+            <Info className="size-4" />
+          </span>
+          <p className="text-xs text-foreground flex-1 min-w-0">
+            <span className="font-semibold">Tip:</span> tekan Enter pada kolom pencarian untuk langsung mencari produk
+          </p>
           <button
             type="button"
-            onClick={() => setSearch("")}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 size-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            aria-label="Bersihkan pencarian"
+            onClick={dismissEnterTip}
+            className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted/60 transition-colors"
+            aria-label="Tutup tip"
           >
             <X className="size-3.5" aria-hidden="true" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Baris cepat "Sering dijual" — hanya di tampilan default (tanpa pencarian/
           filter) agar tidak menambah kebisingan saat kasir sedang mencari. 
           Sekali-tap langsung masuk keranjang: pintasan terbesar untuk item laris. */}
       {showTopSold && (
         <div className="relative">
-          <div className="flex items-center gap-1.5 mb-1.5 text-muted-foreground">
-            <Flame className="size-3.5 text-primary" aria-hidden="true" />
-            <p className="text-xs font-semibold uppercase tracking-wide">Sering dijual</p>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Flame className="size-4 text-orange-500" aria-hidden="true" />
+            <p className="text-sm font-bold">Sering Dijual</p>
           </div>
           <div
             role="group"
@@ -208,8 +288,16 @@ export function CatalogPanel({
                 className="group/qs relative shrink-0 inline-flex items-center gap-2.5 h-12 rounded-xl border border-border/70 bg-card pl-3.5 pr-3 shadow-sm transition-all select-none hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]"
                 aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}${(item.discountAmount ?? 0) > 0 ? ` (diskon dari ${formatIDR(item.sellingPrice)})` : ""}, terjual ${formatQty(soldQty)} kali dalam 30 hari. Tahan untuk memasukkan jumlah.`}
               >
-                <span className="size-6 rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 flex items-center justify-center shrink-0" aria-hidden="true">
-                  {item.type === "PRODUCT" ? <Package className="size-3.5" /> : <Wrench className="size-3.5" />}
+                <span
+                  className="relative size-9 rounded-full overflow-hidden flex items-center justify-center text-lg shrink-0 ring-1 ring-inset ring-black/[0.04]"
+                  style={{ background: pastelFor(item.id) }}
+                  aria-hidden="true"
+                >
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+                  ) : (
+                    itemEmoji(item.name, item.type)
+                  )}
                 </span>
                 <span className="flex flex-col items-start leading-tight">
                   <span className="text-sm font-medium max-w-[150px] truncate">{item.name}</span>
@@ -230,10 +318,12 @@ export function CatalogPanel({
                     <span className="text-[10px] text-muted-foreground tabular">{formatQty(soldQty)}× terjual</span>
                   </span>
                 </span>
-                <Plus
-                  className="size-3.5 text-muted-foreground group-hover/qs:text-primary transition-colors shrink-0"
+                <span
+                  className="size-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 transition-transform group-hover/qs:scale-110"
                   aria-hidden="true"
-                />
+                >
+                  <Plus className="size-3.5" />
+                </span>
                 {/* Bar progres tekan-tahan (500 ms) */}
                 {pressId === item.id && (
                   <span
@@ -246,7 +336,7 @@ export function CatalogPanel({
           </div>
           {/* Isyarat gulir: gradien halus di tepi kanan (non-interaktif) */}
           <div
-            className="pointer-events-none absolute top-7 bottom-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+            className="pointer-events-none absolute top-8 bottom-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
             aria-hidden="true"
           />
         </div>
@@ -258,32 +348,30 @@ export function CatalogPanel({
       {/* Petunjuk shortcut (hanya desktop) */}
       <ShortcutHints />
 
-      {/* Filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg border bg-muted/40 p-0.5" role="tablist" aria-label="Filter jenis item">
-          {(
-            [
-              { key: "ALL", label: "Semua" },
-              { key: "PRODUCT", label: "Produk" },
-              { key: "SERVICE", label: "Jasa" },
-            ] as { key: TypeFilter; label: string }[]
-          ).map((f) => (
-            <button
-              key={f.key}
-              role="tab"
-              aria-selected={type === f.key}
-              onClick={() => setType(f.key)}
-              className={cn(
-                "px-3.5 h-10 text-sm font-medium rounded-md transition-colors focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]",
-                type === f.key
-                  ? "bg-background shadow-sm text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+      {/* Filter jenis — chip pill ala referensi (aktif = solid primary) */}
+      <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter jenis item">
+        {(
+          [
+            { key: "ALL", label: "Semua" },
+            { key: "PRODUCT", label: "Produk" },
+            { key: "SERVICE", label: "Jasa" },
+          ] as { key: TypeFilter; label: string }[]
+        ).map((f) => (
+          <button
+            key={f.key}
+            role="tab"
+            aria-selected={type === f.key}
+            onClick={() => setType(f.key)}
+            className={cn(
+              "px-4 h-10 text-sm rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]",
+              type === f.key
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                : "bg-card border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
         <span className="ml-auto text-sm text-muted-foreground tabular">
           {data?.total ?? 0} item
         </span>
@@ -291,39 +379,58 @@ export function CatalogPanel({
 
       {/* Kategori: chip horizontal sekali-tap — jauh lebih cepat daripada dropdown
           di ponsel/tablet. Baris digulir ke samping bila kategori banyak; scrollbar
-          disembunyikan, gradien tipis di kanan memberi isyarat bisa digeser. */}
+          disembunyikan, gradien tipis di kanan memberi isyarat bisa digeser.
+          Header "Kategori | Lihat Semua" ala referensi (hanya mobile). */}
       {(categories?.data?.length ?? 0) > 0 && (
-        <div className="relative">
-          <div
-            role="group"
-            aria-label="Filter kategori"
-            className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {[{ id: "ALL", name: "Semua kategori" }, ...(categories?.data ?? [])].map((c) => {
-              const active = categoryId === c.id
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoryId(c.id)}
-                  aria-pressed={active}
-                  className={cn(
-                    "shrink-0 h-10 inline-flex items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]",
-                    active
-                      ? "border-primary/40 bg-primary/10 text-primary font-semibold"
-                      : "border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  {c.name}
-                </button>
-              )
-            })}
+        <div>
+          <div className="flex items-center justify-between mb-2 lg:hidden">
+            <div className="flex items-center gap-1.5">
+              <Leaf className="size-4 text-emerald-500" aria-hidden="true" />
+              <h2 className="text-sm font-bold">Kategori</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/app/products")}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              aria-label="Lihat semua produk di halaman Produk"
+            >
+              Lihat Semua
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            </button>
           </div>
-          {/* Isyarat gulir: gradien halus di tepi kanan (non-interaktif) */}
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
-            aria-hidden="true"
-          />
+          <div className="relative">
+            <div
+              role="group"
+              aria-label="Filter kategori"
+              className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {[{ id: "ALL", name: "Semua kategori" }, ...(categories?.data ?? [])].map((c) => {
+                const active = categoryId === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCategoryId(c.id)}
+                    aria-pressed={active}
+                    className={cn(
+                      "shrink-0 h-10 inline-flex items-center gap-1.5 rounded-full px-4 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.96]",
+                      active
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "bg-card border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30"
+                    )}
+                  >
+                    <span aria-hidden="true">{c.id === "ALL" ? "🛒" : categoryEmoji(c.name)}</span>
+                    {c.name}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Isyarat gulir: gradien halus di tepi kanan (non-interaktif) */}
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+              aria-hidden="true"
+            />
+          </div>
         </div>
       )}
 
@@ -331,16 +438,15 @@ export function CatalogPanel({
       {loading && !items.length ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-xl border bg-card p-3.5 space-y-2.5">
-              <div className="flex items-start justify-between">
-                <Skeleton className="size-8 rounded-lg" />
-                <Skeleton className="size-4 rounded" />
-              </div>
-              <Skeleton className="h-3.5 w-4/5 rounded" />
-              <Skeleton className="h-3 w-2/5 rounded" />
-              <div className="pt-2 flex items-center justify-between">
-                <Skeleton className="h-4 w-16 rounded" />
-                <Skeleton className="h-4 w-10 rounded" />
+            <div key={i} className="rounded-2xl border bg-card p-3 flex sm:flex-col flex-row gap-3">
+              <Skeleton className="size-20 sm:size-auto sm:w-full sm:h-28 rounded-xl shrink-0" />
+              <div className="flex flex-col flex-1 min-w-0 space-y-2 py-1">
+                <Skeleton className="h-3.5 w-4/5 rounded" />
+                <Skeleton className="h-3 w-2/5 rounded" />
+                <div className="mt-auto flex items-center justify-between">
+                  <Skeleton className="h-4 w-16 rounded" />
+                  <Skeleton className="size-8 rounded-full" />
+                </div>
               </div>
             </div>
           ))}
@@ -381,7 +487,7 @@ export function CatalogPanel({
                 onContextMenu={(e) => e.preventDefault()}
                 disabled={outOfStock}
                 className={cn(
-                  "group relative flex flex-col rounded-xl border bg-card p-3.5 text-left transition-all select-none",
+                  "group relative flex sm:flex-col flex-row items-stretch gap-2 sm:gap-3 rounded-2xl border bg-card p-2.5 sm:p-3 text-left transition-all select-none",
                   "focus-visible:outline-2 focus-visible:outline-ring active:scale-[0.98]",
                   outOfStock
                     ? "opacity-60 cursor-not-allowed"
@@ -389,73 +495,82 @@ export function CatalogPanel({
                 )}
                 aria-label={`Tambah ${item.name} ke keranjang, harga ${formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}${(item.discountAmount ?? 0) > 0 ? ` (diskon dari ${formatIDR(item.sellingPrice)})` : ""}${outOfStock ? ", stok habis" : ""}. Tahan untuk memasukkan jumlah.`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span
-                    className={cn(
-                      "size-8 rounded-lg flex items-center justify-center shrink-0 ring-1 ring-inset",
-                      item.type === "PRODUCT"
-                        ? "bg-primary/10 text-primary ring-primary/15"
-                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20"
-                    )}
-                    aria-hidden="true"
-                  >
-                    {item.type === "PRODUCT" ? <Package className="size-4" /> : <Wrench className="size-4" />}
-                  </span>
-                  <Plus
-                    className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-hidden="true"
-                  />
-                </div>
-                <p className="mt-2.5 text-sm font-medium leading-tight line-clamp-2 min-h-[2.4em]">{item.name}</p>
-                <div className="mt-auto pt-2 flex items-center justify-between gap-2">
-                  <span className="flex flex-col items-start leading-tight">
+                {/* Media pastel + emoji — mobile: kotak kiri (ala referensi);
+                    desktop: penuh di atas kartu. Badge status menempel di pojok
+                    media (bukan kartu) agar tidak menimpa nama di kartu sempit. */}
+                <span
+                  className={cn(
+                    "relative w-14 h-14 sm:w-full sm:h-28 rounded-lg sm:rounded-xl shrink-0 flex items-center justify-center text-3xl sm:text-5xl",
+                    "ring-1 ring-inset ring-black/[0.04]",
+                    outOfStock && "grayscale"
+                  )}
+                  style={{ background: pastelFor(item.id) }}
+                  aria-hidden="true"
+                >
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 size-full object-cover"
+                    />
+                  ) : (
+                    itemEmoji(item.name, item.type)
+                  )}
+                  {item.type === "PRODUCT" ? (
                     <span
                       className={cn(
-                        "text-sm font-semibold tabular",
-                        outOfStock ? "text-muted-foreground line-through" : "text-primary"
+                        "absolute top-0.5 right-0.5 rounded-full px-1 py-px text-[8.5px] sm:text-[9.5px] font-semibold tabular leading-none",
+                        outOfStock
+                          ? "bg-destructive/10 text-destructive"
+                          : lowStock
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            : "bg-background/90 text-muted-foreground ring-1 ring-inset ring-border/60"
                       )}
                     >
-                      {formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}
+                      {outOfStock ? "Habis" : `${formatQty(item.stockQty)} ${item.unit}`}
                     </span>
-                    {(item.discountAmount ?? 0) > 0 && !outOfStock && (
-                      <span className="text-[10px] text-muted-foreground line-through tabular">
-                        {formatIDR(item.sellingPrice)}
-                      </span>
-                    )}
-                  </span>
-                  {item.type === "PRODUCT" ? (
-                    outOfStock ? (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 border-transparent bg-destructive/10 text-destructive"
-                      >
-                        Habis
-                      </Badge>
-                    ) : lowStock ? (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 border-transparent bg-amber-500/10 text-amber-600 dark:text-amber-400 tabular"
-                      >
-                        {formatQty(item.stockQty)} {item.unit}
-                      </Badge>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground tabular">
-                        {formatQty(item.stockQty)} {item.unit}
-                      </span>
-                    )
                   ) : (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] px-1.5 border-transparent bg-primary/10 text-primary"
-                    >
+                    <span className="absolute top-0.5 right-0.5 rounded-full px-1 py-px text-[8.5px] sm:text-[9.5px] font-semibold leading-none bg-primary/10 text-primary">
                       Jasa
-                    </Badge>
+                    </span>
                   )}
+                </span>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <p className="text-[13px] sm:text-sm font-medium leading-tight line-clamp-2 sm:min-h-[2.4em]">{item.name}</p>
+                  <div className="mt-auto pt-1 sm:pt-2 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
+                    <span className="flex flex-col items-start leading-tight">
+                      <span
+                        className={cn(
+                          "text-[13px] sm:text-sm font-semibold tabular whitespace-nowrap",
+                          outOfStock ? "text-muted-foreground line-through" : "text-primary"
+                        )}
+                      >
+                        {formatIDR(item.sellingPrice - (item.discountAmount ?? 0))}
+                      </span>
+                      {(item.discountAmount ?? 0) > 0 && !outOfStock && (
+                        <span className="text-[10px] text-muted-foreground line-through tabular whitespace-nowrap">
+                          {formatIDR(item.sellingPrice)}
+                        </span>
+                      )}
+                    </span>
+                    {/* Tombol + bulat ala referensi — selalu terlihat */}
+                    <span
+                      className={cn(
+                        "size-7 sm:size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 self-end transition-transform",
+                        !outOfStock && "group-hover:scale-110 group-active:scale-95"
+                      )}
+                      aria-hidden="true"
+                    >
+                      <Plus className="size-3.5 sm:size-4" />
+                    </span>
+                  </div>
                 </div>
                 {/* Bar progres tekan-tahan (500 ms) */}
                 {pressId === item.id && (
                   <span
-                    className="sb-press-fill absolute inset-x-0 bottom-0 h-[3px] rounded-b-xl bg-primary/70"
+                    className="sb-press-fill absolute inset-x-0 bottom-0 h-[3px] rounded-b-2xl bg-primary/70"
                     aria-hidden="true"
                   />
                 )}

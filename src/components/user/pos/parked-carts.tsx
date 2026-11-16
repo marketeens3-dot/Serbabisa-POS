@@ -6,7 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pause, PauseCircle, Play, Trash2 } from "lucide-react";
+import { Clock, Pause, PauseCircle, Play, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -266,14 +266,16 @@ export function ParkedCartsControls({
       {isMobile ? (
         <Sheet open={listOpen} onOpenChange={setListOpen}>
           <SheetTrigger asChild>
+            {/* Pill "Pesanan" ala referensi (ikon jam) — membuka daftar keranjang ditahan */}
             <button
               type="button"
-              className="relative size-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="relative inline-flex items-center gap-1.5 h-9 rounded-full border border-border/60 bg-card px-3 text-xs font-semibold text-foreground hover:border-primary/30 transition-colors"
               aria-label={`Keranjang ditahan (${carts.length})`}
             >
-              <PauseCircle className="size-4.5" />
+              <Clock className="size-3.5 text-primary" aria-hidden="true" />
+              Pesanan
               {carts.length > 0 && (
-                <span className="absolute -top-1 -right-1.5 min-w-4.5 h-4.5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center tabular">
+                <span className="min-w-4.5 h-4.5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center tabular">
                   {carts.length}
                 </span>
               )}

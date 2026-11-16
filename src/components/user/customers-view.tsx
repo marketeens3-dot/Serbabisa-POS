@@ -34,6 +34,7 @@ export default function CustomersView() {
   const [page, setPage] = useState(1)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CustomerDTO | null>(null)
+  const [pointsTarget, setPointsTarget] = useState<CustomerDTO | null>(null)
 
   useResetOnKeyChange(debounced, () => setPage(1))
 
@@ -118,6 +119,16 @@ export default function CustomersView() {
                   <TableCell className="hidden sm:table-cell tabular text-muted-foreground">
                     {c.phone ? formatPhoneDisplay(c.phone) : "—"}
                   </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <button
+                      type="button"
+                      onClick={() => setPointsTarget(c)}
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-xs font-semibold tabular hover:bg-amber-500/20 transition-colors"
+                      title="Klik untuk sesuaikan / redeem poin"
+                    >
+                      {c.points ?? 0} poin
+                    </button>
+                  </TableCell>
                   <TableCell className="hidden lg:table-cell tabular text-muted-foreground">{c.transactionCount ?? 0}</TableCell>
                   <TableCell className="hidden lg:table-cell text-right">
                     <MoneyCell amount={c.totalSpent ?? 0} className="text-muted-foreground" />
@@ -164,6 +175,15 @@ export default function CustomersView() {
           refresh()
         }}
       />
+
+      <PointsDialog
+        target={pointsTarget}
+        onOpenChange={(v) => !v && setPointsTarget(null)}
+        onSaved={() => {
+          setPointsTarget(null)
+          refresh()
+        }}
+      />
     </div>
   )
 }
@@ -175,6 +195,98 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("")
+}
+
+/** Dialog sesuaikan/redeem poin loyalty (earn otomatis dari checkout). */
+function PointsDialog({
+  target,
+  onOpenChange,
+  onSaved,
+}: {
+  target: CustomerDTO | null
+  onOpenChange: (v: boolean) => void
+  onSaved: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [values, setValues] = useState({ points: "", type: "REDEEM", note: "" })
+
+  const [prevTarget, setPrevTarget] = useState<CustomerDTO | null>(null)
+  if (prevTarget !== target) {
+    setPrevTarget(target)
+    if (target) { setFormError(null); setValues({ points: "", type: "REDEEM", note: "" }) }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!target) return
+    setFormError(null)
+    const raw = values.points.trim()
+    const magnitude = Number(raw.replace(/[^0-9]/g, "")) || 0
+    const sign = raw.trim().startsWith("-") ? -1 : 1
+    const points = magnitude * sign
+    if (magnitude <= 0) {
+      setFormError("Isi jumlah poin (boleh diawali minus untuk menambah poin manual).")
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.post<{ points: number }>(`/api/customers/${target.id}/points`, {
+        points: values.type === "ADJUST" ? points : -magnitude,
+        type: values.type,
+        note: values.note.trim() || null,
+      })
+      toast.success(`Poin ${target.name} sekarang ${res.points}.`)
+      onSaved()
+    } catch (err) {
+      setFormError(err instanceof ApiClientError ? err.message : "Gagal menyesuaikan poin.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!target} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            Poin {target?.name ?? ""}
+          </DialogTitle>
+          <DialogDescription>
+            {target ? `Saat ini: ${target.points ?? 0} poin. Earn otomatis: 1 poin per Rp 10.000 belanja.` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSave} className="space-y-4">
+          {formError && (
+            <p className="text-sm text-destructive rounded-lg bg-destructive/10 border border-destructive/25 px-3 py-2.5" role="alert">
+              {formError}
+            </p>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="pts-type">Jenis</Label>
+            <select id="pts-type" value={values.type} onChange={(e) => setValues({ ...values, type: e.target.value })} className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+              <option value="REDEEM">Redeem (kurangi poin)</option>
+              <option value="ADJUST">Koreksi (tambah / kurang manual)</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pts-amount">
+              {values.type === "REDEEM" ? "Poin yang ditukar *" : "Jumlah poin (awali minus untuk mengurangi) *"}
+            </Label>
+            <Input id="pts-amount" value={values.points} onChange={(e) => setValues({ ...values, points: e.target.value.replace(/[^0-9-]/g, "") })} placeholder={values.type === "REDEEM" ? "50" : "50 / -50"} className="tabular" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pts-note">Catatan (opsional)</Label>
+            <Textarea id="pts-note" value={values.note} onChange={(e) => setValues({ ...values, note: e.target.value })} rows={2} maxLength={2000} placeholder="mis. tukar poin menjadi selimut" />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Batal</Button>
+            <Button type="submit" disabled={saving || !target}>{saving ? "Menyimpan…" : "Simpan"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function CustomerFormDialog({

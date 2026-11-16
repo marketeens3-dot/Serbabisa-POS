@@ -20,6 +20,7 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -255,6 +256,14 @@ export default function POSScreen() {
                   style={[s.card, out && s.cardOut]}
                   testID={`product-${p.id}`}
                 >
+                  {/* Gambar produk (WebP) — hanya dimuat bila ada URL; cache native. */}
+                  {p.imageUrl ? (
+                    <Image
+                      source={{ uri: p.imageUrl }}
+                      resizeMode="cover"
+                      style={s.cardImage}
+                    />
+                  ) : null}
                   <Text style={s.cardName} numberOfLines={2}>
                     {p.name}
                   </Text>
@@ -414,6 +423,12 @@ const makeStyles = ({ C, radius, space }: Theme) => StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardOut: { opacity: 0.5 },
+  cardImage: {
+    width: '100%',
+    height: 72,
+    borderRadius: radius.md,
+    backgroundColor: C.surfaceAlt,
+  },
   cardName: { fontSize: 13.5, fontWeight: '700', color: C.text },
   cardSku: { fontSize: 11, color: C.textFaint },
   cardPrice: { fontSize: 15, fontWeight: '800', color: C.primary },

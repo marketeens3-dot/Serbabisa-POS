@@ -13,6 +13,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,45 @@ import {
 } from "@/components/app/shared";
 import { cn } from "@/lib/utils";
 import { formatDateTimeID, formatDateTimeLongID, formatIDR, formatQty } from "@/lib/format";
+import { useCountUp } from "@/hooks/use-count-up";
 import type { DashboardMetricsDTO } from "@/lib/types";
+
+// Sapaan dinamis sesuai jam WIB (Asia/Jakarta) — pengguna ada di Indonesia;
+// jam server bisa UTC, jadi jam dihitung eksplisit lewat Intl + timezone.
+function getHourWIB(d: Date): number {
+  // "24" bisa keluar di sebagian runtime untuk tengah malam → normalisasi ke 0.
+  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", hour12: false }).format(d));
+  return h % 24;
+}
+// Tanggal (1–31) menurut WIB — penentu spirit harian; server UTC vs client WIB
+// bisa beda kalender di sekitar tengah malam, jadi juga dihitung eksplisit.
+function getDateWIB(d: Date): number {
+  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit" }).format(d));
+}
+function getGreeting(d: Date) {
+  const h = getHourWIB(d);
+  if (h >= 4 && h < 11) return { emoji: "☀️", text: "Selamat pagi" };
+  if (h >= 11 && h < 15) return { emoji: "🌤️", text: "Selamat siang" };
+  if (h >= 15 && h < 18) return { emoji: "🌇", text: "Selamat sore" };
+  return { emoji: "🌙", text: "Selamat malam" };
+}
+
+// Semangat harian — dipilih deterministik dari tanggal WIB supaya SSR & client
+// identik (aman hydration) dan berotasi tiap hari, bukan tiap render.
+const SPIRITS = [
+  "Semangat jaga toko hari ini! 💪",
+  "Hari ini pasti lancar!",
+  "Pelayanan ramah, pembeli betah! 🤝",
+  "Produk terlaris menantimu! 🏃",
+  "Satu transaksi lagi, satu langkah maju! 🚀",
+  "Jaga stok, jaga senyum pembeli! 😄",
+  "Kasir rapi, laporan enak dibaca! 📒",
+] as const;
+
+// Snapshot server = false, client = true (pola ThemeToggle di app-shell):
+// sapaan & jam hanya dirender SETELAH mount → bebas hydration mismatch di
+// batas jam/menit antara waktu render server dan hydrate client.
+const emptySubscribe = () => () => {};
 
 export default function DashboardView() {
   const { user, navigate } = useApp();
@@ -40,11 +79,27 @@ export default function DashboardView() {
 
   const weekTotal = (data?.salesLast7Days ?? []).reduce((sum, d) => sum + d.total, 0);
 
+  // Angka KPI berjalan naik (count-up) saat data tiba — dashboard terasa hidup.
+  const animatedSales = useCountUp(data?.salesToday ?? 0);
+  const animatedTx = useCountUp(data?.transactionsToday ?? 0);
+  const animatedAvg = useCountUp(data?.averageTransaction ?? 0);
+  const animatedItems = useCountUp(data?.itemsSoldToday ?? 0);
+
+  // mounted = false saat SSR & render-hydration pertama, lalu true setelah mount
+  // → sapaan jam & jam tampilan tidak pernah bikin hydration mismatch.
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const now = new Date();
+  const greeting = mounted ? getGreeting(now) : { emoji: "👋", text: "Halo" };
+  const spirit = SPIRITS[getDateWIB(now) % SPIRITS.length];
+  const firstName = user.fullName.split(" ")[0];
+
   return (
     <div className="max-w-7xl mx-auto">
       <PageHeader
-        title={`Halo, ${user.fullName.split(" ")[0]} 👋`}
-        description={`Ringkasan toko ${user.tenant?.businessName ?? ""} — ${formatDateTimeLongID(new Date())} WIB`}
+        title={`${greeting.text}, ${firstName}! ${greeting.emoji}`}
+        description={`${spirit} · Ringkasan toko ${user.tenant?.businessName ?? ""}${
+          mounted ? ` — ${formatDateTimeLongID(now)} WIB` : ""
+        }`}
         actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
@@ -53,23 +108,37 @@ export default function DashboardView() {
         }
       />
 
-      {/* Shortcut cepat */}
+      {/* Chip semangat — muncul setelah data dimuat, menggambarkan kondisi hari ini */}
+      {!loading && !error && (
+        <div className="flex flex-wrap items-center gap-2 -mt-2 mb-4">
+          <span className="sb-fun-chip inline-flex items-center gap-1.5 rounded-full border border-primary/20 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm">
+            {data?.transactionsToday
+              ? `🔥 Ramai hari ini — ${data.transactionsToday} transaksi masuk!`
+              : "🚀 Yuk raih transaksi pertama hari ini!"}
+          </span>
+          {weekTotal > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
+              🏆 Seminggu terakhir: <span className="tabular font-semibold text-foreground">{formatIDR(weekTotal)}</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Shortcut cepat — ikon warna-warni, goyang playful saat dihover */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-6">
-        <ShortcutButton icon={ScanBarcode} label="Transaksi Baru" onClick={() => navigate("/app/pos")} primary />
-        <ShortcutButton icon={Package} label="Produk" onClick={() => navigate("/app/products")} />
-        <ShortcutButton icon={Users} label="Pelanggan" onClick={() => navigate("/app/customers")} />
-        <ShortcutButton icon={ReceiptText} label="Riwayat" onClick={() => navigate("/app/transactions")} />
-        <ShortcutButton icon={ChartColumn} label="Laporan" onClick={() => navigate("/app/reports")} />
+        {SHORTCUTS.map((s) => (
+          <ShortcutButton key={s.label} icon={s.icon} label={s.label} onClick={() => navigate(s.path)} chip={s.chip} primary={s.primary} />
+        ))}
       </div>
 
       {error && <ErrorState message={error} onRetry={refresh} />}
 
-      {/* KPI */}
+      {/* KPI — angka count-up + ikon goyang saat kartu dihover */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <StatCard label="Penjualan Hari Ini" value={formatIDR(data?.salesToday ?? 0)} icon={Wallet} tone="success" loading={loading} hint={`Bulan ini: ${formatIDR(data?.salesThisMonth ?? 0)}`} />
-        <StatCard label="Transaksi Hari Ini" value={String(data?.transactionsToday ?? 0)} icon={ReceiptText} loading={loading} hint={`Bulan ini: ${data?.transactionsThisMonth ?? 0}`} />
-        <StatCard label="Rata-rata Transaksi" value={formatIDR(data?.averageTransaction ?? 0)} icon={ShoppingBasket} loading={loading} hint="Hari ini" />
-        <StatCard label="Item Terjual" value={formatQty(data?.itemsSoldToday ?? 0)} icon={Package} loading={loading} hint="Produk + jasa, hari ini" />
+        <StatCard label="Penjualan Hari Ini" value={formatIDR(animatedSales)} icon={Wallet} tone="success" loading={loading} hint={`Bulan ini: ${formatIDR(data?.salesThisMonth ?? 0)}`} wiggle />
+        <StatCard label="Transaksi Hari Ini" value={String(Math.round(animatedTx))} icon={ReceiptText} loading={loading} hint={`Bulan ini: ${data?.transactionsThisMonth ?? 0}`} wiggle />
+        <StatCard label="Rata-rata Transaksi" value={formatIDR(animatedAvg)} icon={ShoppingBasket} loading={loading} hint="Hari ini" wiggle />
+        <StatCard label="Item Terjual" value={formatQty(Math.round(animatedItems))} icon={Package} loading={loading} hint="Produk + jasa, hari ini" wiggle />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
@@ -174,6 +243,7 @@ export default function DashboardView() {
               <EmptyState
                 title="Belum ada transaksi"
                 description="Mulai transaksi pertama Anda lewat halaman Kasir."
+                emoji="🛒"
                 action={
                   <Button size="sm" onClick={() => navigate("/app/pos")}>
                     <ScanBarcode className="size-4" />
@@ -224,7 +294,7 @@ export default function DashboardView() {
                 ))}
               </div>
             ) : !data?.topItems?.length ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">Belum ada penjualan bulan ini.</p>
+              <p className="text-sm text-muted-foreground py-8 text-center">Belum ada penjualan bulan ini — tanaman duluan, panen belakangan 🌱</p>
             ) : (
               <ol className="space-y-2.5">
                 {data.topItems.map((item, i) => (
@@ -246,24 +316,56 @@ export default function DashboardView() {
   )
 }
 
+// Shortcut dashboard — setiap tujuan punya warna ikon sendiri (playful namun
+// tetap dalam sistem warna Tailwind), ikon goyang saat tombol dihover.
+const SHORTCUTS: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  chip: string;
+  primary?: boolean;
+}[] = [
+  {
+    icon: ScanBarcode,
+    label: "Transaksi Baru",
+    path: "/app/pos",
+    chip: "bg-gradient-to-br from-primary to-sky-500 text-primary-foreground ring-primary/40 shadow-lg shadow-primary/25",
+    primary: true,
+  },
+  { icon: Package, label: "Produk", path: "/app/products", chip: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/25" },
+  { icon: Users, label: "Pelanggan", path: "/app/customers", chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/25" },
+  { icon: ReceiptText, label: "Riwayat", path: "/app/transactions", chip: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/25" },
+  { icon: ChartColumn, label: "Laporan", path: "/app/reports", chip: "bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/25" },
+]
+
 function ShortcutButton({
   icon: Icon,
   label,
   onClick,
+  chip,
   primary,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   onClick: () => void
+  chip: string
   primary?: boolean
 }) {
   return (
     <Button
       variant={primary ? "default" : "outline"}
       onClick={onClick}
-      className="h-auto py-3 flex-col gap-1.5 text-xs sm:text-sm font-medium rounded-xl transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+      className="sb-wiggle h-auto py-3 flex-col gap-1.5 text-xs sm:text-sm font-medium rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
     >
-      <Icon className="size-5" />
+      <span
+        className={cn(
+          "size-8 rounded-lg ring-1 flex items-center justify-center transition-transform",
+          chip
+        )}
+        aria-hidden="true"
+      >
+        <Icon className="sb-wiggle-target size-4.5" />
+      </span>
       {label}
     </Button>
   )

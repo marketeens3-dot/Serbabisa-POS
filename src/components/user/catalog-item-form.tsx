@@ -1,11 +1,11 @@
 // Form dialog tambah/ubah produk & jasa — react-hook-form + Zod (pesan error dekat field).
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { api, ApiClientError } from "@/lib/api-client";
+import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
 import type { CatalogItemDTO, CategoryDTO } from "@/lib/types";
 
 const formSchema = z.object({
@@ -59,6 +60,16 @@ export function CatalogItemFormDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /* ---------- Gambar produk (auto-WebP di server) ----------
+     Mode UBAH: pilih file → langsung POST multipart ke /api/catalog/[id]/image.
+     Mode TAMBAH: item belum ada id → file disimpan sementara (pendingFile),
+     diunggah otomatis SETELAH item berhasil dibuat. Gagal gambar tidak
+     menggagalkan penyimpanan item (toast peringatan, bukan error). */
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [imageBusy, setImageBusy] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const form = useForm<FormValues>({
     // Validasi via formSchema di onSubmit — kompatibel penuh dengan Zod 4 (tanpa resolver type-gymnastics).
     defaultValues: {
@@ -87,15 +98,88 @@ export function CatalogItemFormDialog({
         categoryId: item?.categoryId ?? undefined,
         sellingPrice: item?.sellingPrice ?? 0,
         discountPrice: item?.discountAmount ?? 0,
-        costPrice: 0,
+        // Muat HPP tersimpan — tanpa ini, sekali edit menimpa HPP jadi 0.
+        costPrice: item?.costPrice ?? 0,
         stockQty: item?.stockQty ?? 0,
         minStockQty: item?.minStockQty ?? 0,
         unit: item?.unit ?? "pcs",
         description: item?.description ?? "",
         isActive: item?.isActive ?? true,
       })
+      setPreviewUrl(item?.imageUrl ?? null)
+      setPendingFile(null)
+      setImageBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }, [open, item, form])
+
+  /** Unggah langsung (mode ubah): server mengonversi ke WebP + kompres. */
+  async function uploadImageNow(itemId: string, file: File): Promise<string | null> {
+    setImageBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await api.postForm<{ imageUrl: string }>(`/api/catalog/${itemId}/image`, fd)
+      toast.success("Gambar tersimpan — otomatis dikonversi ke WebP.")
+      return res.imageUrl
+    } catch (err) {
+      toast.error(err instanceof ApiClientError ? err.message : "Gagal mengunggah gambar.")
+      return null
+    } finally {
+      setImageBusy(false)
+    }
+  }
+
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = "" // izinkan memilih file yang sama lagi
+    if (!file) return
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Gambar hanya boleh PNG, JPG, atau WEBP.")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ukuran gambar maksimal 10MB (akan dikompres otomatis).")
+      return
+    }
+    if (item) {
+      void uploadImageNow(item.id, file).then((url) => {
+        if (url) {
+          setPreviewUrl(url)
+          onSaved() // segarkan daftar di latar agar thumbnail ikut berubah
+        }
+      })
+    } else {
+      // Mode tambah: simpan dulu, unggah setelah item dibuat.
+      setPendingFile(file)
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(file)
+      })
+    }
+  }
+
+  async function onRemoveImage() {
+    if (item?.imageUrl) {
+      setImageBusy(true)
+      try {
+        await api.del(`/api/catalog/${item.id}/image`)
+        setPreviewUrl(null)
+        toast.success("Gambar produk dihapus.")
+        onSaved()
+      } catch (err) {
+        toast.error(err instanceof ApiClientError ? err.message : "Gagal menghapus gambar.")
+      } finally {
+        setImageBusy(false)
+      }
+    } else {
+      setPendingFile(null)
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
+  }
 
   async function onSubmit(raw: FormValues) {
     // Validasi server-style dengan Zod — error dipetakan ke field terkait.
@@ -134,8 +218,20 @@ export function CatalogItemFormDialog({
         await api.patch(`/api/catalog/${item.id}`, payload)
         toast.success(`${isProduct ? "Produk" : "Jasa"} "${values.name}" berhasil diperbarui.`)
       } else {
-        await api.post("/api/catalog", payload)
+        const created = await api.post<CatalogItemDTO>("/api/catalog", payload)
         toast.success(`${isProduct ? "Produk" : "Jasa"} "${values.name}" berhasil ditambahkan.`)
+        // Auto-upload gambar yang dipilih saat mode tambah (item kini punya id).
+        // Gagal unggah tidak menggagalkan item — toast peringatan dari uploader.
+        if (pendingFile && created?.id) {
+          const url = await uploadImageNow(created.id, pendingFile)
+          setPendingFile(null)
+          if (url) {
+            setPreviewUrl((prev) => {
+              if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev)
+              return url
+            })
+          }
+        }
       }
       onSaved()
     } catch (err) {
@@ -164,6 +260,59 @@ export function CatalogItemFormDialog({
                 {error}
               </p>
             )}
+
+            {/* Gambar produk — otomatis dikonversi WebP + dikompres di server */}
+            <div className="flex items-start gap-3.5 rounded-lg border p-3.5">
+              <div
+                className="relative size-20 rounded-xl overflow-hidden shrink-0 ring-1 ring-inset ring-border/60 flex items-center justify-center text-3xl"
+                style={{ background: pastelFor(item?.id ?? "new") }}
+              >
+                {previewUrl ? (
+                  <img src={previewUrl} alt="Gambar produk" className="absolute inset-0 size-full object-cover" loading="lazy" decoding="async" />
+                ) : (
+                  <span aria-hidden="true">{itemEmoji(form.watch("name") || "", isProduct ? "PRODUCT" : "SERVICE")}</span>
+                )}
+                {imageBusy && (
+                  <span className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                    <Loader2 className="size-5 animate-spin text-primary" aria-hidden="true" />
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Gambar produk</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  PNG/JPG/WEBP hingga 10MB — otomatis dikonversi <span className="font-semibold">WebP</span> &amp; dikompres
+                  agar tampilan kasir tetap ringan. Tampil di kartu produk kasir.
+                </p>
+                <div className="flex items-center gap-2 mt-2.5">
+                  <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onPickFile} aria-hidden="true" tabIndex={-1} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={imageBusy}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImagePlus className="size-4" aria-hidden="true" />
+                    {previewUrl ? "Ganti Gambar" : "Pilih Gambar"}
+                  </Button>
+                  {previewUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={imageBusy}
+                      onClick={() => void onRemoveImage()}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Hapus
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <FormField
               control={form.control}

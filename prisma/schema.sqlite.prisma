@@ -96,6 +96,14 @@ model Tenant {
   invoiceCounters  InvoiceCounter[]
   auditLogs        AuditLog[]
   devices          Device[]
+  projects         Project[]
+  cashflowEntries  CashflowEntry[]
+  suppliers        Supplier[]
+  purchaseOrders   PurchaseOrder[]
+  debts            Debt[]
+  stockOpnames     StockOpname[]
+  vouchers         Voucher[]
+  pointsLedgers    PointsLedger[]
 
   @@index([isActive])
 }
@@ -126,6 +134,9 @@ model CatalogItem {
   sku          String?
   barcode      String?
   description  String?
+  // URL gambar produk (hasil konversi WebP di Supabase Storage, public bucket).
+  // Boleh null — UI kasir memakai placeholder emoji + blob pastel.
+  imageUrl     String?
   categoryId   String?
   category     Category? @relation(fields: [categoryId], references: [id])
   costPrice    Int      @default(0)
@@ -142,6 +153,8 @@ model CatalogItem {
 
   transactionItems TransactionItem[]
   inventoryMovements InventoryMovement[]
+  purchaseOrderItems PurchaseOrderItem[]
+  stockOpnameItems   StockOpnameItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -159,11 +172,17 @@ model Customer {
   email     String?
   address   String?
   notes     String?
+  // Loyalty poin (Tier 2): bertambah otomatis per transaksi dengan pelanggan,
+  // dikurangi saat redeem/penyesuaian manual. Riwayat lengkap di PointsLedger.
+  points    Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions Transaction[]
+  transactions   Transaction[]
+  pointsLedgers  PointsLedger[]
+  debts          Debt[]
+  projects       Project[]
 
   @@index([tenantId, name])
   @@index([tenantId, phone])
@@ -204,12 +223,22 @@ model Transaction {
   refundedAt     DateTime?
   refundedById   String?
   refundedBy     User?    @relation("RefundedBy", fields: [refundedById], references: [id])
+  // Penjualan untuk proyek/RAB — checkout dengan projectId membuat RabRealization
+  // otomatis per item (source SALE). SetNull: hapus proyek tidak menghapus penjualan.
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  // Voucher/promo (Tier 2): kode + nominal diskon voucher terekam untuk pelaporan.
+  voucherCode    String?
+  voucherDiscount Int     @default(0)
   idempotencyKey String?  @unique
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   items TransactionItem[]
   inventoryMovements InventoryMovement[]
+  realizations RabRealization[]
+  debts Debt[]
+  pointsLedgers PointsLedger[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, createdAt])
@@ -401,4 +430,276 @@ model SyncState {
 
   @@id([entity, entityId])
   @@index([entity, dirty])
+}
+
+// ============================================================================
+// FINANS & OPERASIONAL (Tier 1 + Tier 2) — RAB, Cashflow, Hutang Piutang,
+// Pembelian/Supplier, Stok Opname, Voucher, Loyalty Poin.
+// Konvensi sama: money = Int rupiah, enum = String + validasi Zod.
+// ============================================================================
+
+// ---------- RAB (Rencana Anggaran Biaya) ----------
+model Project {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code        String    // unik per tenant, mis. RAB-2026-001
+  name        String
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  description String?
+  status      String    @default("PLANNED") // PLANNED | ACTIVE | COMPLETED | CANCELLED
+  budgetTotal Int       @default(0) // Σ budgetAmount item — dihitung ulang server
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items        RabItem[]
+  realizations RabRealization[]
+  transactions Transaction[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+}
+
+// Item anggaran dalam proyek: nama barang/jasa, volume, satuan, harga anggaran.
+model RabItem {
+  id           String   @id @default(uuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenantId     String
+  name         String
+  quantity     Float
+  unit         String   @default("pcs")
+  unitPrice    Int // anggaran per satuan
+  budgetAmount Int // quantity × unitPrice — dihitung ulang server (anti tampering)
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  realizations RabRealization[]
+
+  @@index([projectId])
+}
+
+// Realisasi biaya proyek. Otomatis (source SALE): setiap item transaksi yang
+// dibuat di kasir dengan projectId terisi. Manual (source MANUAL): dicatat dari
+// halaman RAB (mis. pembayaran tenaga kerja yang tidak lewat katalog).
+model RabRealization {
+  id            String       @id @default(uuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenantId      String
+  rabItemId     String?
+  rabItem       RabItem?     @relation(fields: [rabItemId], references: [id], onDelete: SetNull)
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  description   String
+  quantity      Float        @default(1)
+  amount        Int
+  source        String       @default("MANUAL") // MANUAL | SALE
+  createdAt     DateTime     @default(now())
+
+  @@index([projectId])
+  @@index([tenantId, createdAt])
+}
+
+// ---------- CASHFLOW (kas masuk / keluar) ----------
+// MANUAL        → diinput pemilik (gaji, sewa, setoran modal, dst.)
+// DEBT_PAYMENT  → otomatis saat cicilan piutang/hutang dibayar CASH
+// PURCHASE_CASH → otomatis saat PO diterima dan dibayar tunai
+model CashflowEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  direction   String   // IN | OUT
+  category    String
+  amount      Int
+  note        String?
+  entryDate   DateTime
+  source      String   @default("MANUAL") // MANUAL | DEBT_PAYMENT | PURCHASE_CASH
+  refType     String?  // DebtPayment | PurchaseOrder
+  refId       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, entryDate])
+  @@index([tenantId, direction, entryDate])
+}
+
+// ---------- SUPPLIER & PEMBELIAN ----------
+model Supplier {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  debts          Debt[]
+
+  @@index([tenantId, name])
+}
+
+model PurchaseOrder {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code        String    // PO-YYYYMMDD-NNN — generate server, unik per tenant
+  supplierId  String
+  supplier    Supplier  @relation(fields: [supplierId], references: [id])
+  status      String    @default("DRAFT") // DRAFT | ORDERED | RECEIVED | CANCELLED
+  totalAmount Int       @default(0)
+  note        String?
+  orderedAt   DateTime?
+  receivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items PurchaseOrderItem[]
+  debts Debt[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid())
+  purchaseId       String
+  purchase         PurchaseOrder @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  tenantId         String
+  catalogItemId    String
+  catalogItem      CatalogItem   @relation(fields: [catalogItemId], references: [id])
+  itemNameSnapshot String
+  quantity         Float
+  unitCost         Int // harga beli per unit — jadi costPrice (HPP terakhir) saat diterima
+  subtotal         Int
+  createdAt        DateTime      @default(now())
+
+  @@index([purchaseId])
+}
+
+// ---------- HUTANG PIUTANG ----------
+// RECEIVABLE = piutang pelanggan (jual tempo, otomatis dari checkout TEMPO)
+// PAYABLE    = hutang supplier (beli tempo, otomatis saat PO diterima TEMPO)
+model Debt {
+  id            String         @id @default(uuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type          String         // RECEIVABLE | PAYABLE
+  amount        Int
+  paidAmount    Int            @default(0)
+  status        String         @default("UNPAID") // UNPAID | PARTIAL | PAID
+  dueDate       DateTime?
+  customerId    String?
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  supplierId    String?
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  transactionId String?
+  transaction   Transaction?   @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  purchaseId    String?
+  purchase      PurchaseOrder? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  note          String?
+  createdById   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  payments DebtPayment[]
+
+  @@index([tenantId, type, status])
+  @@index([tenantId, dueDate])
+}
+
+model DebtPayment {
+  id           String   @id @default(uuid())
+  debtId       String
+  debt         Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  tenantId     String
+  amount       Int
+  method       String   @default("CASH") // CASH | TRANSFER | QRIS | OTHER
+  note         String?
+  paidAt       DateTime @default(now())
+  receivedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([debtId])
+}
+
+// ---------- STOK OPNAME ----------
+model StockOpname {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items StockOpnameItem[]
+
+  @@index([tenantId, createdAt])
+}
+
+model StockOpnameItem {
+  id               String      @id @default(uuid())
+  opnameId         String
+  opname           StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  tenantId         String
+  catalogItemId    String
+  catalogItem      CatalogItem @relation(fields: [catalogItemId], references: [id])
+  itemNameSnapshot String
+  systemQty        Float
+  physicalQty      Float
+  diffQty          Float // physical − system (negatif = kurang)
+  createdAt        DateTime    @default(now())
+
+  @@index([opnameId])
+}
+
+// ---------- VOUCHER / PROMO ----------
+model Voucher {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code        String // unik per tenant, disimpan UPPERCASE
+  type        String    // PERCENT | FIXED
+  value       Int // PERCENT: 1-100; FIXED: nominal Rp
+  minPurchase Int       @default(0)
+  maxDiscount Int? // khusus PERCENT — batas diskon maksimal
+  usageLimit  Int? // null = tanpa batas pemakaian
+  usageCount  Int       @default(0)
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+// ---------- LOYALTY POIN ----------
+// Poin otomatis per transaksi COMPLETED berpelanggan: floor(total / LOYALTY_EARN_DIVISOR).
+// Perubahan manual (redeem di kasir / koreksi) dicatat type REDEEM / ADJUST.
+model PointsLedger {
+  id            String       @id @default(uuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  points        Int // bertanda: + earn/adjust naik, − redeem/adjust turun
+  type          String       // EARN | REDEEM | ADJUST
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  note          String?
+  createdAt     DateTime     @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([tenantId, createdAt])
 }

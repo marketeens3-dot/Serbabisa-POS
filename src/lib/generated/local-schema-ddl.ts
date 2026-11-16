@@ -2,7 +2,7 @@
 //
 // DDL untuk membuat database SQLite lokal saat first-run. Dipakai oleh
 // src/lib/local-db-bootstrap.ts supaya .exe tidak memerlukan Prisma CLI.
-// Sumber: prisma/schema.sqlite.prisma (17 tabel, 48 index)
+// Sumber: prisma/schema.sqlite.prisma (30 tabel, 68 index)
 
 /** DDL SQLite lengkap untuk skema aplikasi (kosong → siap pakai). */
 export const LOCAL_SCHEMA_DDL = `-- CreateTable
@@ -75,6 +75,7 @@ CREATE TABLE "CatalogItem" (
     "sku" TEXT,
     "barcode" TEXT,
     "description" TEXT,
+    "imageUrl" TEXT,
     "categoryId" TEXT,
     "costPrice" INTEGER NOT NULL DEFAULT 0,
     "sellingPrice" INTEGER NOT NULL,
@@ -98,6 +99,7 @@ CREATE TABLE "Customer" (
     "email" TEXT,
     "address" TEXT,
     "notes" TEXT,
+    "points" INTEGER NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -129,6 +131,9 @@ CREATE TABLE "Transaction" (
     "refundReason" TEXT,
     "refundedAt" DATETIME,
     "refundedById" TEXT,
+    "projectId" TEXT,
+    "voucherCode" TEXT,
+    "voucherDiscount" INTEGER NOT NULL DEFAULT 0,
     "idempotencyKey" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -137,7 +142,8 @@ CREATE TABLE "Transaction" (
     CONSTRAINT "Transaction_cashierId_fkey" FOREIGN KEY ("cashierId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Transaction_cashSessionId_fkey" FOREIGN KEY ("cashSessionId") REFERENCES "CashSession" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Transaction_voidedById_fkey" FOREIGN KEY ("voidedById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Transaction_refundedById_fkey" FOREIGN KEY ("refundedById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Transaction_refundedById_fkey" FOREIGN KEY ("refundedById") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Transaction_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -267,6 +273,218 @@ CREATE TABLE "SyncState" (
     "syncedHash" TEXT,
 
     PRIMARY KEY ("entity", "entityId")
+);
+
+-- CreateTable
+CREATE TABLE "Project" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "customerId" TEXT,
+    "description" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PLANNED',
+    "budgetTotal" INTEGER NOT NULL DEFAULT 0,
+    "startDate" DATETIME,
+    "endDate" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Project_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Project_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RabItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "projectId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "quantity" REAL NOT NULL,
+    "unit" TEXT NOT NULL DEFAULT 'pcs',
+    "unitPrice" INTEGER NOT NULL,
+    "budgetAmount" INTEGER NOT NULL,
+    "note" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RabItem_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RabRealization" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "projectId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "rabItemId" TEXT,
+    "transactionId" TEXT,
+    "description" TEXT NOT NULL,
+    "quantity" REAL NOT NULL DEFAULT 1,
+    "amount" INTEGER NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'MANUAL',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RabRealization_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RabRealization_rabItemId_fkey" FOREIGN KEY ("rabItemId") REFERENCES "RabItem" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "RabRealization_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "Transaction" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CashflowEntry" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "direction" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "note" TEXT,
+    "entryDate" DATETIME NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'MANUAL',
+    "refType" TEXT,
+    "refId" TEXT,
+    "createdById" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "CashflowEntry_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Supplier" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "phone" TEXT,
+    "address" TEXT,
+    "notes" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Supplier_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "PurchaseOrder" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "supplierId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'DRAFT',
+    "totalAmount" INTEGER NOT NULL DEFAULT 0,
+    "note" TEXT,
+    "orderedAt" DATETIME,
+    "receivedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "PurchaseOrder_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "PurchaseOrder_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "PurchaseOrderItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "purchaseId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "catalogItemId" TEXT NOT NULL,
+    "itemNameSnapshot" TEXT NOT NULL,
+    "quantity" REAL NOT NULL,
+    "unitCost" INTEGER NOT NULL,
+    "subtotal" INTEGER NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PurchaseOrderItem_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "PurchaseOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "PurchaseOrderItem_catalogItemId_fkey" FOREIGN KEY ("catalogItemId") REFERENCES "CatalogItem" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Debt" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "paidAmount" INTEGER NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'UNPAID',
+    "dueDate" DATETIME,
+    "customerId" TEXT,
+    "supplierId" TEXT,
+    "transactionId" TEXT,
+    "purchaseId" TEXT,
+    "note" TEXT,
+    "createdById" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Debt_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Debt_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Debt_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Debt_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "Transaction" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Debt_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "PurchaseOrder" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "DebtPayment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "debtId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "amount" INTEGER NOT NULL,
+    "method" TEXT NOT NULL DEFAULT 'CASH',
+    "note" TEXT,
+    "paidAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "receivedById" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "DebtPayment_debtId_fkey" FOREIGN KEY ("debtId") REFERENCES "Debt" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "StockOpname" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "note" TEXT,
+    "createdById" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "StockOpname_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "StockOpnameItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "opnameId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "catalogItemId" TEXT NOT NULL,
+    "itemNameSnapshot" TEXT NOT NULL,
+    "systemQty" REAL NOT NULL,
+    "physicalQty" REAL NOT NULL,
+    "diffQty" REAL NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "StockOpnameItem_opnameId_fkey" FOREIGN KEY ("opnameId") REFERENCES "StockOpname" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "StockOpnameItem_catalogItemId_fkey" FOREIGN KEY ("catalogItemId") REFERENCES "CatalogItem" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Voucher" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "value" INTEGER NOT NULL,
+    "minPurchase" INTEGER NOT NULL DEFAULT 0,
+    "maxDiscount" INTEGER,
+    "usageLimit" INTEGER,
+    "usageCount" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "expiresAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Voucher_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "PointsLedger" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenantId" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "points" INTEGER NOT NULL,
+    "type" TEXT NOT NULL,
+    "transactionId" TEXT,
+    "note" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PointsLedger_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "PointsLedger_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "PointsLedger_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "Transaction" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -411,4 +629,64 @@ CREATE INDEX "InvoiceBlock_deviceId_idx" ON "InvoiceBlock"("deviceId");
 CREATE UNIQUE INDEX "InvoiceBlock_tenantId_deviceId_startSeq_key" ON "InvoiceBlock"("tenantId", "deviceId", "startSeq");
 
 -- CreateIndex
-CREATE INDEX "SyncState_entity_dirty_idx" ON "SyncState"("entity", "dirty");`
+CREATE INDEX "SyncState_entity_dirty_idx" ON "SyncState"("entity", "dirty");
+
+-- CreateIndex
+CREATE INDEX "Project_tenantId_status_idx" ON "Project"("tenantId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Project_tenantId_code_key" ON "Project"("tenantId", "code");
+
+-- CreateIndex
+CREATE INDEX "RabItem_projectId_idx" ON "RabItem"("projectId");
+
+-- CreateIndex
+CREATE INDEX "RabRealization_projectId_idx" ON "RabRealization"("projectId");
+
+-- CreateIndex
+CREATE INDEX "RabRealization_tenantId_createdAt_idx" ON "RabRealization"("tenantId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "CashflowEntry_tenantId_entryDate_idx" ON "CashflowEntry"("tenantId", "entryDate");
+
+-- CreateIndex
+CREATE INDEX "CashflowEntry_tenantId_direction_entryDate_idx" ON "CashflowEntry"("tenantId", "direction", "entryDate");
+
+-- CreateIndex
+CREATE INDEX "Supplier_tenantId_name_idx" ON "Supplier"("tenantId", "name");
+
+-- CreateIndex
+CREATE INDEX "PurchaseOrder_tenantId_status_idx" ON "PurchaseOrder"("tenantId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PurchaseOrder_tenantId_code_key" ON "PurchaseOrder"("tenantId", "code");
+
+-- CreateIndex
+CREATE INDEX "PurchaseOrderItem_purchaseId_idx" ON "PurchaseOrderItem"("purchaseId");
+
+-- CreateIndex
+CREATE INDEX "Debt_tenantId_type_status_idx" ON "Debt"("tenantId", "type", "status");
+
+-- CreateIndex
+CREATE INDEX "Debt_tenantId_dueDate_idx" ON "Debt"("tenantId", "dueDate");
+
+-- CreateIndex
+CREATE INDEX "DebtPayment_debtId_idx" ON "DebtPayment"("debtId");
+
+-- CreateIndex
+CREATE INDEX "StockOpname_tenantId_createdAt_idx" ON "StockOpname"("tenantId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "StockOpnameItem_opnameId_idx" ON "StockOpnameItem"("opnameId");
+
+-- CreateIndex
+CREATE INDEX "Voucher_tenantId_isActive_idx" ON "Voucher"("tenantId", "isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Voucher_tenantId_code_key" ON "Voucher"("tenantId", "code");
+
+-- CreateIndex
+CREATE INDEX "PointsLedger_customerId_createdAt_idx" ON "PointsLedger"("customerId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "PointsLedger_tenantId_createdAt_idx" ON "PointsLedger"("tenantId", "createdAt");`

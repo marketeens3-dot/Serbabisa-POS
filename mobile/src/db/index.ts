@@ -124,6 +124,10 @@ const MIGRATIONS: string[][] = [
      );`,
     `CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status, createdAt);`,
   ],
+  // v2 — gambar produk (WebP, diunggah dari web, URL publik Supabase Storage).
+  // CREATE TABLE v1 sengaja TIDAK diubah: instalasi baru menjalankan v1 lalu
+  // v2 (ALTER), jadi tidak ada cabang skema yang berbeda.
+  [`ALTER TABLE cache_product ADD COLUMN imageUrl TEXT;`],
 ];
 
 /** Buka (dan migrasi) database. Dipanggil sekali, hasilnya di-cache. */

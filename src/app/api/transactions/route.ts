@@ -13,11 +13,12 @@ import { db } from '@/lib/db'
 import { checkoutSchema } from '@/lib/validation'
 import { ApiError, assertSameOrigin, getClientIp, getUserAgent, handleApiError, parsePagination, requireUser } from '@/lib/api'
 import { logAudit } from '@/lib/audit'
-import { AUDIT_ACTIONS } from '@/lib/constants'
+import { AUDIT_ACTIONS, DEBT_STATUSES, DEBT_TYPES, LOYALTY_EARN_DIVISOR, POINTS_LEDGER_TYPES } from '@/lib/constants'
 import { formatIDR, jakartaYear } from '@/lib/format'
 import { allocateInvoiceNumber, ensureInvoiceBlockReady } from '@/lib/invoice-number'
 import { parseInvoiceSettings } from '@/lib/services/tenant'
 import { toTransactionDTO } from '@/lib/services/serializers'
+import { computeVoucherDiscount } from '@/lib/voucher'
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
         include: {
           cashier: { select: { fullName: true } },
           customer: { select: { name: true, phone: true } },
+          project: { select: { name: true, code: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -103,6 +105,7 @@ export async function POST(req: NextRequest) {
           items: true,
           cashier: { select: { fullName: true } },
           customer: { select: { name: true, phone: true } },
+          project: { select: { name: true, code: true } },
         },
       })
       if (existing) {
@@ -220,8 +223,35 @@ export async function POST(req: NextRequest) {
       if (discountAmount > subtotal) {
         throw new ApiError('DISCOUNT_TOO_LARGE', 'Diskon tidak boleh melebihi subtotal.', 400)
       }
+
+      // ---------- VOUCHER (Tier 2) ----------
+      // Validasi ulang penuh di server: aktif, kedaluwarsa, kuota, minimal belanja.
+      // Diskon voucher menumpuk di atas diskon transaksi, total dibatasi subtotal.
+      let voucherDiscount = 0
+      if (body.voucherCode) {
+        const voucher = await tx.voucher.findFirst({ where: { tenantId, code: body.voucherCode } })
+        if (!voucher) throw new ApiError('VOUCHER_NOT_FOUND', `Voucher "${body.voucherCode}" tidak ditemukan.`, 404)
+        if (!voucher.isActive) throw new ApiError('VOUCHER_INACTIVE', 'Voucher tidak aktif.', 400)
+        if (voucher.expiresAt && voucher.expiresAt.getTime() < Date.now()) {
+          throw new ApiError('VOUCHER_EXPIRED', 'Voucher sudah kedaluwarsa.', 400)
+        }
+        if (voucher.usageLimit !== null && voucher.usageCount >= voucher.usageLimit) {
+          throw new ApiError('VOUCHER_EXHAUSTED', 'Kuota pemakaian voucher sudah habis.', 400)
+        }
+        if (subtotal < voucher.minPurchase) {
+          throw new ApiError(
+            'VOUCHER_MIN_PURCHASE',
+            `Minimal belanja ${formatIDR(voucher.minPurchase)} untuk pakai voucher "${voucher.code}".`,
+            400
+          )
+        }
+        voucherDiscount = computeVoucherDiscount(voucher.type, voucher.value, voucher.maxDiscount, subtotal)
+        await tx.voucher.update({ where: { id: voucher.id }, data: { usageCount: { increment: 1 } } })
+      }
+      const totalDiscount = Math.min(subtotal, discountAmount + voucherDiscount)
+
       const taxAmount = body.taxAmount
-      const totalAmount = subtotal - discountAmount + taxAmount
+      const totalAmount = subtotal - totalDiscount + taxAmount
 
       // ---------- VERIFIKASI TRANSAKSI YANG DIANTRE OFFLINE ----------
       // Klien native mengirim `clientTotal`: jumlah yang benar-benar diterima
@@ -242,16 +272,42 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      if (body.paidAmount < totalAmount) {
+      // ---------- PEMBAYARAN (TEMPO = jual tempo / kredit) ----------
+      // TEMPO: paidAmount = uang muka (DP). Selisih menjadi PIUTANG otomatis.
+      let debtAmount = 0
+      let debtDueDate: Date | null = null
+      if (body.paymentMethod === 'TEMPO') {
+        if (!body.customerId) {
+          throw new ApiError('TEMPO_NEEDS_CUSTOMER', 'Penjualan tempo wajib memilih pelanggan (pemilik piutang).', 400)
+        }
+        if (body.paidAmount >= totalAmount) {
+          throw new ApiError(
+            'TEMPO_AMOUNT',
+            `Jumlah bayar (DP) harus kurang dari total untuk jual tempo — kalau lunas, pakai metode lain.`,
+            400
+          )
+        }
+        debtAmount = totalAmount - body.paidAmount
+        debtDueDate = new Date(Date.now() + (body.dueDays ?? 30) * 24 * 60 * 60 * 1000)
+      } else if (body.paidAmount < totalAmount) {
         throw new ApiError('INVALID_PAYMENT', 'Jumlah bayar kurang dari total belanja.', 400)
       }
-      const changeAmount = body.paidAmount - totalAmount
+      const changeAmount = body.paymentMethod === 'TEMPO' ? 0 : body.paidAmount - totalAmount
 
       // ---------- CUSTOMER OWNERSHIP ----------
       if (body.customerId) {
         const customer = await tx.customer.findFirst({ where: { id: body.customerId, tenantId } })
         if (!customer) {
           throw new ApiError('CUSTOMER_NOT_FOUND', 'Pelanggan tidak ditemukan.', 404)
+        }
+      }
+
+      // ---------- PROYEK / RAB ----------
+      if (body.projectId) {
+        const project = await tx.project.findFirst({ where: { id: body.projectId, tenantId } })
+        if (!project) throw new ApiError('PROJECT_NOT_FOUND', 'Proyek tidak ditemukan.', 404)
+        if (project.status === 'CANCELLED') {
+          throw new ApiError('PROJECT_CANCELLED', 'Proyek sudah dibatalkan — tidak bisa menerima penjualan baru.', 409)
         }
       }
 
@@ -288,9 +344,66 @@ export async function POST(req: NextRequest) {
           status: 'COMPLETED',
           notes: body.notes ?? null,
           idempotencyKey: body.idempotencyKey ?? null,
+          projectId: body.projectId ?? null,
+          voucherCode: body.voucherCode ?? null,
+          voucherDiscount,
           items: { create: lines },
         },
       })
+
+      // ---------- REALISASI RAB OTOMATIS ----------
+      // Transaksi untuk proyek → setiap item jadi entri realisasi (source SALE)
+      // sehingga laporan anggaran vs realisasi terisi tanpa input manual.
+      if (body.projectId) {
+        await tx.rabRealization.createMany({
+          data: lines.map((line) => ({
+            tenantId,
+            projectId: body.projectId!,
+            transactionId: transaction.id,
+            description: line.itemNameSnapshot,
+            quantity: line.quantity,
+            amount: line.subtotal,
+            source: 'SALE',
+          })),
+        })
+      }
+
+      // ---------- PIUTANG OTOMATIS (TEMPO) ----------
+      if (debtAmount > 0) {
+        await tx.debt.create({
+          data: {
+            tenantId,
+            type: DEBT_TYPES.RECEIVABLE,
+            amount: debtAmount,
+            status: DEBT_STATUSES.UNPAID,
+            dueDate: debtDueDate,
+            customerId: body.customerId ?? null,
+            transactionId: transaction.id,
+            note: `Nota ${invoiceNumber} — jual tempo (DP ${formatIDR(body.paidAmount)})`,
+            createdById: user.id,
+          },
+        })
+      }
+
+      // ---------- LOYALTY POIN OTOMATIS (Tier 2) ----------
+      // 1 poin per Rp LOYALTY_EARN_DIVISOR (dibulatkan ke bawah), hanya transaksi
+      // berpelanggan. Redeem manual lewat /api/customers/[id]/points.
+      if (body.customerId && totalAmount > 0) {
+        const pointsEarned = Math.floor(totalAmount / LOYALTY_EARN_DIVISOR)
+        if (pointsEarned > 0) {
+          await tx.customer.update({ where: { id: body.customerId }, data: { points: { increment: pointsEarned } } })
+          await tx.pointsLedger.create({
+            data: {
+              tenantId,
+              customerId: body.customerId,
+              points: pointsEarned,
+              type: POINTS_LEDGER_TYPES.EARN,
+              transactionId: transaction.id,
+              note: `Otomatis dari nota ${invoiceNumber}`,
+            },
+          })
+        }
+      }
 
       // ---------- MUTASI STOK + AUDIT ----------
       // createMany: satu round-trip ke DB alih-alih await per baris (keranjang besar).
@@ -312,7 +425,7 @@ export async function POST(req: NextRequest) {
         action: AUDIT_ACTIONS.TRANSACTION_CREATED,
         resourceType: 'Transaction',
         resourceId: transaction.id,
-        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod, discountPercent, discountAmount, itemDiscountTotal },
+        metadata: { invoiceNumber, totalAmount, itemCount: lines.length, paymentMethod: body.paymentMethod, discountPercent, discountAmount, itemDiscountTotal, voucherDiscount, voucherCode: body.voucherCode ?? null, projectId: body.projectId ?? null, debtAmount, pointsEarned: body.customerId ? Math.floor(totalAmount / LOYALTY_EARN_DIVISOR) : 0 },
         ipAddress: ip,
         userAgent: ua,
       })
@@ -323,6 +436,7 @@ export async function POST(req: NextRequest) {
           items: true,
           cashier: { select: { fullName: true } },
           customer: { select: { name: true, phone: true } },
+          project: { select: { name: true, code: true } },
         },
       })
       },

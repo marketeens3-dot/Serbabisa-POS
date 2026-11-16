@@ -1,19 +1,24 @@
 // POS / Kasir — layout utama: banner shift (atas), katalog (kiri) + keranjang
-// (kanan), mobile pakai tab. Keranjang baru dikosongkan HANYA setelah RPC sukses
-// (gagal → keranjang tetap agar bisa diperbaiki).
-// Shortcut kasir: F2 "/" fokus cari · F4 parkir keranjang · F8 / Ctrl+Enter bayar.
+// (kanan). Mobile ala referensi: satu halaman gulir — header brand + sapaan,
+// kartu shift/penjualan, katalog, dan keranjang sebagai sheet melayang di atas
+// bar "Menu | Bayar Sekanang" + bottom nav. Keranjang baru dikosongkan HANYA
+// setelah RPC sukses (gagal → keranjang tetap agar bisa diperbaiki).
+// Shortcut kasir: F2 "/" / Ctrl+K fokus cari · F4 parkir keranjang · F8 / Ctrl+Enter bayar.
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Plus, ScanBarcode, ShoppingCart } from "lucide-react";
+import { ArrowRight, Bell, CreditCard, LayoutGrid, Plus, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { CatalogPanel } from "@/components/user/pos/catalog-panel";
 import { CartPanel } from "@/components/user/pos/cart-panel";
 import { CheckoutDialog } from "@/components/user/pos/checkout-dialog";
 import { PosSuccess } from "@/components/user/pos/pos-success";
 import { ShiftBanner } from "@/components/user/pos/shift-banner";
+import { UserMenu } from "@/components/app/user-menu";
+import SyncIndicator from "@/components/app/sync-indicator";
 import { useShift } from "@/components/user/pos/use-shift";
 import {
   DeleteParkedDialog,
@@ -33,6 +38,7 @@ import {
 import { dismissParkedCartTip } from "@/components/user/pos/parked-cart-tip";
 import { loadPinnedDiscount, savePinnedDiscount } from "@/components/user/pos/pinned-discount";
 import { useApp } from "@/components/app/app-context";
+import { useIsBelowLg } from "@/hooks/use-mobile";
 import { api } from "@/lib/api-client";
 import { formatIDR, formatPercentID, formatQty } from "@/lib/format";
 import { playCartTick, playCheckoutSuccess } from "@/lib/pos-sound";
@@ -62,14 +68,10 @@ async function fetchActiveItems(ids: Set<string>): Promise<Map<string, CatalogIt
 }
 
 export default function PosView() {
-  const { user } = useApp()
+  const { user, navigate, logout, openNavDrawer, stockAlertCount } = useApp()
+  const isBelowLg = useIsBelowLg()
   const tenantId = user.tenant?.id ?? null
   const [cart, setCart] = useState<CartLine[]>([])
-  /* Tab POS di layar < lg (ponsel/tablet): satu instance CatalogPanel & CartPanel
-     dipasang sekali — visibilitas via CSS. Lebih ringan daripada memasang dua
-     instance (fetch katalog ganda) dan searchInputRef selalu menunjuk input yang
-     terlihat. Di layar ≥ lg tab disembunyikan: katalog + keranjang berdampingan. */
-  const [posTab, setPosTab] = useState<"catalog" | "cart">("catalog")
   const [customerId, setCustomerId] = useState<string | null>(null)
   /* Diskon transaksi: mode "rp" (nominal manual) atau "pct" (persen diterapkan ke
      SELURUH item di keranjang — otomatis jadi harga diskon). discountInput = nilai
@@ -167,6 +169,12 @@ export default function PosView() {
         searchInputRef.current?.focus()
         return
       }
+      // Ctrl/Cmd+K — ala desain referensi (badge "Ctrl + K" di kolom cari).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !typing) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
       if (e.key === "F4") {
         e.preventDefault()
         if (cart.length > 0) setParkDialogOpen(true)
@@ -228,7 +236,6 @@ export default function PosView() {
   const subtotal = useMemo(() => cart.reduce((s, l) => s + lineGross(l), 0), [cart])
   // Total diskon per produk (Σ diskon baris) — dipisah dari diskon transaksi.
   const itemDiscountTotal = useMemo(() => cart.reduce((s, l) => s + lineDiscount(l), 0), [cart])
-  const cartCount = useMemo(() => cart.reduce((s, l) => s + l.quantity, 0), [cart])
   // Nominal diskon transaksi efektif (Rp): mode % dibulatkan ke bawah — rumus SAMA
   // dengan server (floor(subtotalNet × pct / 100)) agar angka di layar = angka di
   // nota = angka di database. Basis persen = subtotal NET (setelah diskon per item).
@@ -241,18 +248,14 @@ export default function PosView() {
   )
   const discountPercentSent = discountMode === "pct" ? discountInput : 0
 
-  // Badge Keranjang "pop" saat jumlah bertambah (setelah cartCount terdefinisi).
-  const prevCountRef = useRef(0)
-  const [popKey, setPopKey] = useState(0)
-  useEffect(() => {
-    if (cartCount > prevCountRef.current) setPopKey(Date.now())
-    prevCountRef.current = cartCount
-  }, [cartCount])
   async function handleCheckout(payload: {
     paymentMethod: string
     paidAmount: number
     taxAmount: number
     notes: string | null
+    voucherCode: string | null
+    projectId: string | null
+    dueDays?: number
   }) {
     setSubmitting(true)
     try {
@@ -272,6 +275,9 @@ export default function PosView() {
         paymentMethod: payload.paymentMethod,
         paidAmount: payload.paidAmount,
         notes: payload.notes,
+        voucherCode: payload.voucherCode,
+        projectId: payload.projectId,
+        dueDays: payload.dueDays,
         idempotencyKey,
       })
       // SUKSES → baru bersihkan keranjang + refresh total live shift.
@@ -327,27 +333,8 @@ export default function PosView() {
   function startNewTransaction() {
     setSuccessTx(null)
     setIdempotencyKey("")
-    setPosTab("catalog") // ponsel/tablet: mulai transaksi baru dari katalog
     setTimeout(() => searchInputRef.current?.focus(), 50)
   }
-
-  /* Navigasi keyboard tablist (roving tabindex) — Arrow/Home/End pindah tab. */
-  const onTablistKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const tabs = ["catalog", "cart"] as const
-      const idx = tabs.indexOf(posTab)
-      let next = -1
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % tabs.length
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + tabs.length) % tabs.length
-      else if (e.key === "Home") next = 0
-      else if (e.key === "End") next = tabs.length - 1
-      if (next < 0) return
-      e.preventDefault()
-      setPosTab(tabs[next])
-      document.getElementById(`pos-tab-${tabs[next]}`)?.focus()
-    },
-    [posTab]
-  )
 
   /* ------------------------- Parkir keranjang ------------------------- */
 
@@ -482,7 +469,54 @@ export default function PosView() {
   )
 
   return (
-    <div className="max-w-[1600px] mx-auto">
+    <div className="max-w-[1600px] mx-auto max-lg:pb-40">
+      {/* ---------- Header mobile ala referensi: brand + sapaan + notifikasi ---------- */}
+      <header className="lg:hidden mb-4">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo-icon.png" alt="" className="h-9 w-auto" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-lg tracking-tight leading-tight truncate">
+              {user.tenant?.businessName ?? "Serbabisa"}
+            </p>
+            <p className="text-[11px] text-muted-foreground truncate">Transaksi cepat, lebih mudah</p>
+          </div>
+          <SyncIndicator />
+          <button
+            type="button"
+            onClick={() => navigate("/app/products/stok")}
+            className="relative size-9 flex items-center justify-center rounded-full bg-card border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={stockAlertCount > 0 ? `${stockAlertCount} produk stok menipis — lihat daftar` : "Notifikasi"}
+          >
+            <Bell className="size-4.5" aria-hidden="true" />
+            {stockAlertCount > 0 && (
+              <span className="absolute top-1 right-1 size-2.5 rounded-full bg-red-500 ring-2 ring-background" aria-hidden="true" />
+            )}
+          </button>
+          <UserMenu
+            user={user}
+            onProfile={() => navigate("/app/profile")}
+            onLogout={logout}
+            isAdmin={user.role === "SUPER_ADMIN"}
+            showThemeItem
+          />
+        </div>
+        <div className="relative mt-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[26px] leading-tight font-extrabold tracking-tight">Selamat Datang!</h1>
+            <p className="text-sm text-muted-foreground mt-1">Semangat berjualan hari ini 💪</p>
+          </div>
+          {/* Maskot ringan: emoji dalam blob pastel + gelembung keranjang (tanpa aset gambar) */}
+          <div className="relative shrink-0" aria-hidden="true">
+            <div className="size-16 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center text-4xl rotate-6">
+              🧋
+            </div>
+            <div className="absolute -bottom-1.5 -left-2.5 size-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md">
+              <ShoppingCart className="size-3.5" />
+            </div>
+          </div>
+        </div>
+      </header>
+
       <ShiftBanner shift={shift} />
 
       {successTx ? (
@@ -495,84 +529,60 @@ export default function PosView() {
       ) : (
         <>
           {/* ---------- SATU LAYOUT UNTUK SEMUA UKURAN LAYAR ----------
-              < lg: segmented control Katalog ↔ Keranjang (sticky di bawah topbar).
-              ≥ lg: dua kolom berdampingan, tab disembunyikan. Panel tetap terpasang
-              (hanya disembunyikan CSS) — nol fetch ganda, ref pencarian konsisten. */}
+              < lg: satu halaman gulir — katalog penuh, keranjang jadi sheet melayang
+              di atas bar Menu/Bayar (selalu terlihat, tanpa tab).
+              ≥ lg: dua kolom berdampingan, keranjang sticky. Panel terpasang sekali
+              — nol fetch ganda, ref pencarian konsisten. */}
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] lg:gap-5 lg:items-start">
-            {/* Segmented control — ponsel/tablet; sticky agar bisa berpindah tab
-                kapan pun tanpa scroll ke atas. */}
-            <div className="sticky top-14 z-10 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-2 pb-2 -mt-1 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 lg:hidden">
-              <div
-                role="tablist"
-                aria-label="Mode kasir"
-                onKeyDown={onTablistKeyDown}
-                className="grid grid-cols-2 bg-muted text-muted-foreground rounded-lg p-[3px]"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  id="pos-tab-catalog"
-                  aria-selected={posTab === "catalog"}
-                  aria-controls="pos-panel-catalog"
-                  data-state={posTab === "catalog" ? "active" : "inactive"}
-                  tabIndex={posTab === "catalog" ? 0 : -1}
-                  onClick={() => setPosTab("catalog")}
-                  className={cn(
-                    "data-[state=active]:bg-background dark:data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground dark:text-muted-foreground",
-                    "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[2px] focus-visible:outline-1 data-[state=active]:shadow-sm active:scale-[0.97]"
-                  )}
-                >
-                  <ScanBarcode className="size-4" aria-hidden="true" />
-                  Katalog
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="pos-tab-cart"
-                  aria-selected={posTab === "cart"}
-                  aria-controls="pos-panel-cart"
-                  data-state={posTab === "cart" ? "active" : "inactive"}
-                  tabIndex={posTab === "cart" ? 0 : -1}
-                  onClick={() => setPosTab("cart")}
-                  className={cn(
-                    "data-[state=active]:bg-background dark:data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground dark:text-muted-foreground",
-                    "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[2px] focus-visible:outline-1 data-[state=active]:shadow-sm active:scale-[0.97]"
-                  )}
-                >
-                  <ShoppingCart className="size-4" aria-hidden="true" />
-                  Keranjang
-                  {cartCount > 0 && (
-                    <span
-                      key={popKey}
-                      className="ml-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 tabular min-w-5 sb-pop"
-                    >
-                      {Math.round(cartCount * 100) / 100}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Panel katalog — terlihat saat tab Katalog aktif (< lg) / selalu (≥ lg) */}
-            <div
-              role="tabpanel"
-              id="pos-panel-catalog"
-              aria-labelledby="pos-tab-catalog"
-              className={cn("min-w-0 outline-none max-lg:mt-2", posTab === "catalog" ? "block" : "hidden", "lg:block")}
-            >
+            <div className="min-w-0">
               <CatalogPanel searchInputRef={searchInputRef} onAdd={addToCart} />
             </div>
 
-            {/* Panel keranjang — sticky di layar lebar */}
-            <div
-              role="tabpanel"
-              id="pos-panel-cart"
-              aria-labelledby="pos-tab-cart"
-              className={cn("outline-none max-lg:mt-2 lg:sticky lg:top-20", posTab === "cart" ? "block" : "hidden", "lg:block")}
-            >
-              {cartPanel}
-            </div>
+            {/* Keranjang. MOBILE: PORTAL ke body — leluhur .sb-fade-in (animation
+                fill both) menjadi containing block position:fixed, sehingga sheet
+                tertambat di dasar KONTEN, bukan viewport (bug yang sama dengan
+                chip "masuk keranjang" di bawah). Desktop: kolom kanan sticky.
+                Satu instance saja — dipilih lewat breakpoint hook, nol fetch ganda. */}
+            {isBelowLg ? (
+              createPortal(
+                <div className="fixed inset-x-3 bottom-[8.5rem] z-30 no-print">{cartPanel}</div>,
+                document.body
+              )
+            ) : (
+              <div className="outline-none lg:sticky lg:top-20">{cartPanel}</div>
+            )}
           </div>
+
+          {/* ---------- Bar aksi bawah (mobile ala referensi): Menu + Bayar Sekarang ----------
+              PORTAL ke body — alasan sama dengan sheet keranjang di atas. */}
+          {createPortal(
+            <div
+              className="fixed inset-x-3 bottom-[4.4rem] z-40 flex items-center gap-2 lg:hidden no-print"
+              style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            >
+              <Button
+                variant="outline"
+                onClick={openNavDrawer}
+                className="h-12 rounded-full px-4 gap-2 bg-card shadow-md shrink-0 active:scale-[0.97] font-semibold"
+                aria-label="Buka menu navigasi"
+              >
+                <LayoutGrid className="size-4.5 text-primary" aria-hidden="true" />
+                Menu
+              </Button>
+              <Button
+                className="flex-1 h-12 rounded-full text-base font-bold gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
+                disabled={cart.length === 0 || submitting || discount > subtotal - itemDiscountTotal || payLocked}
+                onClick={openCheckout}
+                title={payLocked ? "Terkunci — mulai shift terlebih dahulu untuk menerima pembayaran" : undefined}
+                aria-label={`Bayar Sekarang — ${formatIDR(Math.max(0, subtotal - itemDiscountTotal - discount))}`}
+              >
+                <CreditCard className="size-4.5" aria-hidden="true" />
+                Bayar Sekarang
+                <ArrowRight className="size-4.5" aria-hidden="true" />
+              </Button>
+            </div>,
+            document.body
+          )}
         </>
       )}
 
@@ -584,7 +594,7 @@ export default function PosView() {
         createPortal(
           <div
             key={addedFlash.n}
-            className="fixed bottom-[4.75rem] lg:bottom-8 left-1/2 -translate-x-1/2 z-40 pointer-events-none no-print"
+            className="fixed bottom-[8.25rem] lg:bottom-8 left-1/2 -translate-x-1/2 z-40 pointer-events-none no-print"
             role="status"
             aria-live="polite"
           >
@@ -608,6 +618,7 @@ export default function PosView() {
         discount={discount}
         discountPercent={discountPercentSent}
         submitting={submitting}
+        hasCustomer={!!customerId}
         onSubmit={handleCheckout}
       />
 

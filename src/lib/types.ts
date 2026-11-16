@@ -6,7 +6,7 @@ import type { InvoiceTemplateConfig } from '@/lib/invoice'
 export type Role = 'SUPER_ADMIN' | 'USER'
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
 export type CatalogType = 'PRODUCT' | 'SERVICE'
-export type PaymentMethod = 'CASH' | 'TRANSFER' | 'QRIS' | 'OTHER'
+export type PaymentMethod = 'CASH' | 'TRANSFER' | 'QRIS' | 'OTHER' | 'TEMPO'
 export type TransactionStatus = 'COMPLETED' | 'VOID' | 'REFUNDED'
 export type CashSessionStatus = 'OPEN' | 'CLOSED'
 
@@ -56,8 +56,12 @@ export type CatalogItemDTO = {
   sku: string | null
   barcode: string | null
   description: string | null
+  /** URL gambar produk (WebP di Supabase Storage) — null = tanpa gambar. */
+  imageUrl: string | null
   categoryId: string | null
   categoryName?: string | null
+  /** Harga pokok / HPP (Rp) — otomatis terisi harga beli terakhir saat PO diterima. */
+  costPrice: number
   sellingPrice: number
   /** Diskon per unit (Rp) — harga jadi = sellingPrice − discountAmount. */
   discountAmount: number
@@ -91,6 +95,8 @@ export type CustomerDTO = {
   address: string | null
   notes: string | null
   isActive: boolean
+  /** Loyalty poin (Tier 2) — bertambah otomatis per transaksi, dikurangi saat redeem. */
+  points?: number
   transactionCount?: number
   totalSpent?: number
   lastTransactionAt?: string | null
@@ -138,6 +144,12 @@ export type TransactionDTO = {
   customerId: string | null
   customerName?: string | null
   customerPhone?: string | null
+  /** Penjualan untuk proyek/RAB (null = transaksi reguler). */
+  projectId?: string | null
+  projectName?: string | null
+  /** Voucher promo yang dipakai (null = tanpa voucher). */
+  voucherCode?: string | null
+  voucherDiscount?: number
   items?: TransactionItemDTO[]
 }
 

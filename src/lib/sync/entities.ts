@@ -107,7 +107,7 @@ export const ENTITIES: readonly EntityDef[] = [
     timeField: 'updatedAt',
     tenantScoped: true,
     fields: [
-      'id', 'tenantId', 'type', 'name', 'sku', 'barcode', 'description', 'categoryId',
+      'id', 'tenantId', 'type', 'name', 'sku', 'barcode', 'description', 'imageUrl', 'categoryId',
       'costPrice', 'sellingPrice', 'discountAmount', 'minStockQty', 'unit', 'isActive', 'createdAt', 'updatedAt',
       // stockQty IKUT disinkronkan, karena nilainya adalah hasil turunan dari
       // ledger (InventoryMovement) yang sudah lengkap titik awalnya.

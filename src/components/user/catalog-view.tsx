@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CatalogItemFormDialog } from "@/components/user/catalog-item-form";
 import { MovementHistoryDialog } from "@/components/user/movement-history-dialog";
 import { StockAdjustDialog } from "@/components/user/stock-adjust-dialog";
+import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
 import {
   EmptyState,
   ErrorState,
@@ -195,8 +196,24 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
               {items.map((item) => (
                 <TableRow key={item.id} className={item.isLowStock ? "bg-amber-500/5" : undefined}>
                   <TableCell className="font-medium max-w-[150px] sm:max-w-[220px]">
-                    <p className="truncate">{item.name}</p>
-                    {!item.isActive && <p className="text-xs text-muted-foreground">dinonaktifkan</p>}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {/* Thumbnail gambar produk (WebP) — fallback emoji seperti kasir */}
+                      <span
+                        className="relative size-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-base ring-1 ring-inset ring-border/50"
+                        style={{ background: pastelFor(item.id) }}
+                        aria-hidden="true"
+                      >
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />
+                        ) : (
+                          itemEmoji(item.name, item.type)
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate">{item.name}</p>
+                        {!item.isActive && <p className="text-xs text-muted-foreground">dinonaktifkan</p>}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular">
                     {item.sku ?? "—"}
