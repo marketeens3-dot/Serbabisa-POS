@@ -165,8 +165,10 @@ export default function TransactionDetailView({ transactionId }: { transactionId
             }
           />
 
-          <div className="grid lg:grid-cols-5 gap-5 items-start">
-            <div className="lg:col-span-3 space-y-4">
+          {/* grid-cols-1 dasar (minmax(0,1fr)) — TANPA ini track "auto" mengikuti
+              min-content tabel item (~377px) dan halaman meluber di ponsel. */}
+          <div className="grid grid-cols-1 gap-5 items-start lg:grid-cols-5">
+            <div className="min-w-0 lg:col-span-3 space-y-4">
               {/* Info utama */}
               <Card>
                 <CardContent className="p-5">
@@ -277,7 +279,7 @@ export default function TransactionDetailView({ transactionId }: { transactionId
             </div>
 
             {/* Totals + preview — kartu gaya struk */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="min-w-0 lg:col-span-2 space-y-4">
               <Card>
                 <CardContent className="p-5">
                   <div className="flex items-center gap-3 pb-4 border-b border-dashed">

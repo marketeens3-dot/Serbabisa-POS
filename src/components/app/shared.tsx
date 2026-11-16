@@ -30,7 +30,10 @@ export function PageHeader({
             <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{description}</p>
           )}
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {/* Aksi: flex-wrap TANPA shrink-0 — 5 tombol sekaligus (mis. detail
+            transaksi: Cetak/Unduh/WhatsApp/Refund/Batalkan) tak boleh memaksa
+            halaman melebar di ponsel; mereka pindah baris, bukan terpotong. */}
+        {actions && <div className="flex flex-wrap items-center gap-2 min-w-0">{actions}</div>}
       </div>
       <div
         className="h-px bg-gradient-to-r from-border via-border/60 to-transparent"

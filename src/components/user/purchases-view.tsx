@@ -342,16 +342,26 @@ function CreatePoDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpen
           <div className="space-y-2">
             <Label>Item pembelian</Label>
             {lines.map((l, i) => (
-              <div key={i} className="grid grid-cols-[1fr_80px_110px_auto] gap-2 items-center">
-                <select value={l.catalogItemId} onChange={(e) => pickCatalog(i, e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm" aria-label={`Item ${i + 1}`}>
+              /* Baris item: mobile = 2 baris (produk penuh, lalu Qty+Harga+hapus
+                 sebaris) agar tak meluber keluar dialog; desktop = 4 kolom ala
+                 spreadsheet. sm:contents → anak div dalam jadi sel grid desktop. */
+              <div key={i} className="flex flex-wrap items-center gap-2 sm:grid sm:grid-cols-[1fr_80px_110px_auto] sm:gap-2">
+                <select
+                  value={l.catalogItemId}
+                  onChange={(e) => pickCatalog(i, e.target.value)}
+                  className="w-full min-w-0 h-9 rounded-md border border-input bg-transparent px-2 text-sm sm:flex-1"
+                  aria-label={`Item ${i + 1}`}
+                >
                   <option value="">— Pilih produk —</option>
                   {(catalog?.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name} (stok {formatNumberID(c.stockQty)})</option>)}
                 </select>
-                <Input inputMode="decimal" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".") })} placeholder="Qty" className="h-9" aria-label="Jumlah" />
-                <Input inputMode="numeric" value={l.unitCost} onChange={(e) => setLine(i, { unitCost: e.target.value.replace(/[^0-9]/g, "") })} placeholder="Harga beli" className="h-9 tabular" aria-label="Harga beli" />
-                <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} disabled={lines.length <= 1} aria-label="Hapus baris">
-                  ×
-                </Button>
+                <div className="flex flex-1 min-w-0 items-center gap-2 sm:contents">
+                  <Input inputMode="decimal" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".") })} placeholder="Qty" className="h-9 flex-1 min-w-14" aria-label="Jumlah" />
+                  <Input inputMode="numeric" value={l.unitCost} onChange={(e) => setLine(i, { unitCost: e.target.value.replace(/[^0-9]/g, "") })} placeholder="Harga beli" className="h-9 flex-1 min-w-20 tabular" aria-label="Harga beli" />
+                  <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))} disabled={lines.length <= 1} aria-label="Hapus baris">
+                    ×
+                  </Button>
+                </div>
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" onClick={() => setLines((prev) => [...prev, { catalogItemId: "", quantity: "", unitCost: "" }])}>
