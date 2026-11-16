@@ -168,11 +168,11 @@ export default function TransactionsView() {
                   <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">{tx.cashierName ?? "—"}</TableCell>
                   <TableCell><PaymentMethodBadge method={tx.paymentMethod} /></TableCell>
                   <TableCell><TransactionStatusBadge status={tx.status} /></TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right whitespace-nowrap">
                     <MoneyCell amount={tx.totalAmount} className={tx.status === "VOID" ? "line-through text-muted-foreground" : "font-semibold"} />
                     {tx.refundedAmount > 0 && (
-                      <p className="text-xs tabular text-amber-700 dark:text-amber-400">
-                        −{formatIDR(tx.refundedAmount)} direfund
+                      <p className="text-xs tabular text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                        −{formatIDR(tx.refundedAmount)} <span className="hidden sm:inline">direfund</span>
                       </p>
                     )}
                   </TableCell>

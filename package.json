@@ -9,7 +9,7 @@
     "dev": "bash scripts/with-env.sh next dev -p 3000",
     "dev:win": "next dev -p 3000 --webpack",
     "build": "next build",
-    "start": "next start -p 3000",
+    "start": "bash scripts/with-env.sh next start -p 3000",
     "postinstall": "prisma generate && node scripts/generate-sqlite-schema.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

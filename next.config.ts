@@ -3,11 +3,24 @@ import type { NextConfig } from "next";
 // Security headers — prinsip ISO/IEC 27001:2022 (information security).
 // Dev (Turbopack) butuh unsafe-eval/inline untuk HMR; production tanpa unsafe-eval.
 const isProd = process.env.NODE_ENV === "production";
+// Origin penyimpanan gambar produk (Supabase Storage) — gambar dirender langsung
+// oleh <img> di browser, jadi origin-nya HARUS diizinkan di img-src. Tanpa ini
+// gambar tersimpan di DB & storage dan URL-nya valid (200), tapi selalu tampak
+// "tidak terlihat" karena CSP memblokir permintaan gambarnya.
+const supabaseOrigin = (() => {
+  const raw = process.env.SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+})();
 const csp = [
   "default-src 'self'",
   isProd ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
   "font-src 'self' data:",
   "connect-src 'self'",
   // Hanya halaman ini sendiri boleh meng-iframe (anti klikjacking).

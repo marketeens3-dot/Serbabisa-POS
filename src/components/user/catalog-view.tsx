@@ -188,7 +188,9 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                 <TableHead className="hidden sm:table-cell">Kategori</TableHead>
                 <TableHead className="text-right">Harga</TableHead>
                 {isProduct && <TableHead className="text-right">Stok</TableHead>}
-                <TableHead>Status</TableHead>
+                {/* Status: tersembunyi di ponsel — produk nonaktif sudah tertanda
+                    "dinonaktifkan" di bawah nama, agar tabel muat tanpa terpotong. */}
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -247,7 +249,7 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                       )}
                     </TableCell>
                   )}
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     {item.isActive ? <UserStatusBadge status="ACTIVE" /> : <UserStatusBadge status="INACTIVE" />}
                   </TableCell>
                   <TableCell className="text-right">
