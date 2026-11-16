@@ -21,12 +21,18 @@ import { deleteProductImage, isStorageConfigured, productObjectPath, uploadProdu
 
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
+// Pesan yang sama dipakai di semua jalur STORAGE_UNCONFIGURED — menyebut env
+// yang hilang & lokasi settingnya, supaya operator deployment (mis. Vercel)
+// langsung tahu cara memperbaiki tanpa membuka log server.
+const STORAGE_SETUP_HINT =
+  'Penyimpanan gambar belum dikonfigurasi di server. Set SUPABASE_URL dan SUPABASE_SECRET_KEY pada Environment Variables (Vercel: Settings → Environment Variables, untuk Production + Preview), lalu redeploy.'
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     assertSameOrigin(req)
     const { user, tenantId } = await requireUser()
     if (!isStorageConfigured()) {
-      throw new ApiError('STORAGE_UNCONFIGURED', 'Penyimpanan gambar belum dikonfigurasi di server.', 503)
+      throw new ApiError('STORAGE_UNCONFIGURED', STORAGE_SETUP_HINT, 503)
     }
     const { id } = await params
 
@@ -97,7 +103,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     assertSameOrigin(req)
     const { user, tenantId } = await requireUser()
     if (!isStorageConfigured()) {
-      throw new ApiError('STORAGE_UNCONFIGURED', 'Penyimpanan gambar belum dikonfigurasi di server.', 503)
+      throw new ApiError('STORAGE_UNCONFIGURED', STORAGE_SETUP_HINT, 503)
     }
     const { id } = await params
 
@@ -126,6 +132,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 /** URL publik objek (base, tanpa versi) — memakai URL env yang sama dengan storage.ts. */
 async function publicUrl(path: string): Promise<string> {
   const base = process.env.SUPABASE_URL
-  if (!base) throw new ApiError('STORAGE_UNCONFIGURED', 'Penyimpanan gambar belum dikonfigurasi di server.', 503)
+  if (!base) throw new ApiError('STORAGE_UNCONFIGURED', STORAGE_SETUP_HINT, 503)
   return `${base}/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/${path}`
 }

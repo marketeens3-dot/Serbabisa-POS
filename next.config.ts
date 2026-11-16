@@ -20,7 +20,12 @@ const csp = [
   "default-src 'self'",
   isProd ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
+  // Origin Supabase Storage — gambar produk dirender langsung oleh <img> di
+  // browser, jadi domainnya HARUS diizinkan di img-src. Wildcard *.supabase.co
+  // diizinkan permanen supaya gambar tetap tampil di deployment (mis. Vercel)
+  // yang env-nya belum terbaca saat build; origin SUPABASE_URL ditambahkan bila
+  // ada agar URL persis yang dikonfigurasi (mis. self-host) juga lolos.
+  `img-src 'self' data: blob: https://*.supabase.co${supabaseOrigin ? ` ${supabaseOrigin}` : ""}`,
   "font-src 'self' data:",
   "connect-src 'self'",
   // Hanya halaman ini sendiri boleh meng-iframe (anti klikjacking).

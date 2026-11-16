@@ -184,7 +184,15 @@ lihat `.env.example`. Ganti password akun demo sebelum dipakai production.
    untuk Production + Preview:
    - `DATABASE_URL` = string **transaction pooler**:
      `postgresql://postgres.<ref>:<password-encoded>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1`
-   - (tidak ada env lain yang dibutuhkan aplikasi)
+   - `SUPABASE_URL` = Project URL dari dashboard Supabase
+     (`https://<ref>.supabase.co`) — dipakai untuk **gambar produk**.
+   - `SUPABASE_SECRET_KEY` = **Secret key** API dari dashboard Supabase
+     (Settings → API, format baru `sb_secret_...`) — dipakai untuk upload gambar
+     produk. Jangan pakai anon/publishable key di sini.
+   - Dua env Supabase di atas opsional: tanpa itu aplikasi tetap berjalan,
+     hanya fitur gambar produk yang nonaktif (upload menolak dengan pesan yang
+     menjelaskan env apa yang kurang). Gambar yang sudah terunggah tetap tampil
+     karena CSP mengizinkan `https://*.supabase.co`.
 4. **Deploy**. Setelah selesai, inisialisasi database (sekali saja, dari lokal):
    ```bash
    DATABASE_URL="<session-pooler-url>" npm run db:push
