@@ -1,17 +1,14 @@
-// Dashboard kasir: KPI hari ini, grafik 7 hari, stok menipis, transaksi terbaru, shortcut cepat.
+// Dashboard kasir: hero sapaan, kartu navigasi cepat, KPI hari ini (chip tren
+// vs kemarin dihitung riil dari salesLast7Days), grafik 7 hari, stok menipis,
+// transaksi terbaru, item terlaris — gaya visual ala desain referensi.
 "use client";
 
 import {
-  ChartColumn,
   ChevronRight,
   Package,
-  ReceiptText,
   RefreshCw,
   ScanBarcode,
-  ShoppingBasket,
   TriangleAlert,
-  Users,
-  Wallet,
 } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,13 +19,13 @@ import { useApi } from "@/hooks/use-api";
 import { useApp } from "@/components/app/app-context";
 import { MiniBarChart } from "@/components/app/mini-bar-chart";
 import {
+  DesignStatCard,
   EmptyState,
   ErrorState,
   MoneyCell,
-  PageHeader,
   PaymentMethodBadge,
   RankBadge,
-  StatCard,
+  TrendChip,
   TransactionStatusBadge,
 } from "@/components/app/shared";
 import { cn } from "@/lib/utils";
@@ -36,24 +33,17 @@ import { formatDateTimeID, formatDateTimeLongID, formatIDR, formatQty } from "@/
 import { useCountUp } from "@/hooks/use-count-up";
 import type { DashboardMetricsDTO } from "@/lib/types";
 
-// Sapaan dinamis sesuai jam WIB (Asia/Jakarta) — pengguna ada di Indonesia;
-// jam server bisa UTC, jadi jam dihitung eksplisit lewat Intl + timezone.
-function getHourWIB(d: Date): number {
-  // "24" bisa keluar di sebagian runtime untuk tengah malam → normalisasi ke 0.
-  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", hour12: false }).format(d));
-  return h % 24;
-}
 // Tanggal (1–31) menurut WIB — penentu spirit harian; server UTC vs client WIB
 // bisa beda kalender di sekitar tengah malam, jadi juga dihitung eksplisit.
 function getDateWIB(d: Date): number {
   return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit" }).format(d));
 }
-function getGreeting(d: Date) {
-  const h = getHourWIB(d);
-  if (h >= 4 && h < 11) return { emoji: "☀️", text: "Selamat pagi" };
-  if (h >= 11 && h < 15) return { emoji: "🌤️", text: "Selamat siang" };
-  if (h >= 15 && h < 18) return { emoji: "🌇", text: "Selamat sore" };
-  return { emoji: "🌙", text: "Selamat malam" };
+// ymd "YYYY-MM-DD" WIB untuk hari ini / kemarin (en-CA = ISO). Dipakai mencari
+// entri kemarin di salesLast7Days agar chip "+X% dari kemarin" memakai data riil.
+function ymdWIB(offsetDays = 0): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - offsetDays);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(d);
 }
 
 // Semangat harian — dipilih deterministik dari tanggal WIB supaya SSR & client
@@ -69,8 +59,7 @@ const SPIRITS = [
 ] as const;
 
 // Snapshot server = false, client = true (pola ThemeToggle di app-shell):
-// sapaan & jam hanya dirender SETELAH mount → bebas hydration mismatch di
-// batas jam/menit antara waktu render server dan hydrate client.
+// teks tanggal hanya dirender SETELAH mount → bebas hydration mismatch.
 const emptySubscribe = () => () => {};
 
 export default function DashboardView() {
@@ -85,65 +74,151 @@ export default function DashboardView() {
   const animatedAvg = useCountUp(data?.averageTransaction ?? 0);
   const animatedItems = useCountUp(data?.itemsSoldToday ?? 0);
 
-  // mounted = false saat SSR & render-hydration pertama, lalu true setelah mount
-  // → sapaan jam & jam tampilan tidak pernah bikin hydration mismatch.
+  // mounted = false saat SSR & render-hydration pertama, lalu true setelah mount.
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const now = new Date();
-  const greeting = mounted ? getGreeting(now) : { emoji: "👋", text: "Halo" };
   const spirit = SPIRITS[getDateWIB(now) % SPIRITS.length];
   const firstName = user.fullName.split(" ")[0];
 
+  // --- Chip tren riil "dari kemarin" (dari deret 7 hari, ymd WIB) ---
+  const y = (data?.salesLast7Days ?? []).find((d) => d.ymd === ymdWIB(1));
+  const pctChange = (todayVal: number | null | undefined, yesterdayVal: number | null | undefined): number | null => {
+    if (todayVal === undefined || todayVal === null || !yesterdayVal || yesterdayVal <= 0) return null;
+    return Math.round(((todayVal - yesterdayVal) / yesterdayVal) * 100);
+  };
+  const salesPct = pctChange(data?.salesToday, y?.total);
+  const txPct = pctChange(data?.transactionsToday, y?.count);
+  const yAvg = y && y.count > 0 ? y.total / y.count : null;
+  const avgPct = pctChange(data?.averageTransaction, yAvg);
+  const fmtDelta = (p: number) => `${p >= 0 ? "+" : ""}${p}% dari kemarin`;
+
   return (
     <div className="max-w-7xl mx-auto">
-      <PageHeader
-        title={`${greeting.text}, ${firstName}! ${greeting.emoji}`}
-        description={`${spirit} · Ringkasan toko ${user.tenant?.businessName ?? ""}${
-          mounted ? ` — ${formatDateTimeLongID(now)} WIB` : ""
-        }`}
-        actions={
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
-            Muat ulang
-          </Button>
-        }
-      />
+      {/* Hero sapaan ala desain — gradien biru, blob putih, maskot 🧋, tombol
+          muat ulang kecil di pojok. Menggantikan PageHeader + chip semangat. */}
+      <section
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-200 via-indigo-100 to-blue-200 dark:from-slate-800 dark:via-slate-800/80 dark:to-slate-800 ring-1 ring-inset ring-white/60 dark:ring-white/10 p-5 sm:p-6 pr-24 sm:pr-28 mb-5"
+        aria-label={`Sapaan untuk ${firstName}`}
+      >
+        {/* Dekorasi lembut */}
+        <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/50 dark:bg-white/10" aria-hidden="true" />
+        <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/35 dark:bg-white/5" aria-hidden="true" />
+        <span className="pointer-events-none absolute top-4 right-24 text-amber-400 select-none" aria-hidden="true">✦</span>
 
-      {/* Chip semangat — muncul setelah data dimuat, menggambarkan kondisi hari ini */}
-      {!loading && !error && (
-        <div className="flex flex-wrap items-center gap-2 -mt-2 mb-4">
-          <span className="sb-fun-chip inline-flex items-center gap-1.5 rounded-full border border-primary/20 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm">
-            {data?.transactionsToday
-              ? `🔥 Ramai hari ini — ${data.transactionsToday} transaksi masuk!`
-              : "🚀 Yuk raih transaksi pertama hari ini!"}
-          </span>
-          {weekTotal > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground">
-              🏆 Seminggu terakhir: <span className="tabular font-semibold text-foreground">{formatIDR(weekTotal)}</span>
+        {/* Maskot toko */}
+        <span className="pointer-events-none absolute right-3 bottom-0 text-[4.5rem] sm:text-8xl leading-none select-none drop-shadow-md" aria-hidden="true">
+          🧋
+        </span>
+        <span className="pointer-events-none absolute right-24 sm:right-28 top-6 text-xl select-none" aria-hidden="true">✨</span>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={refresh}
+          disabled={loading}
+          className="absolute top-3 right-3 size-8 rounded-full bg-white/60 dark:bg-white/10 hover:bg-white text-slate-700 dark:text-slate-200"
+          aria-label="Muat ulang data dashboard"
+        >
+          <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
+        </Button>
+
+        <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
+          Halo, {firstName}! <span aria-hidden="true">👋</span>
+        </p>
+        <p className="text-sm sm:text-base font-medium text-slate-600 dark:text-slate-300 mt-1">{spirit}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 tabular">
+          {user.tenant?.businessName ?? "Toko Anda"}
+          {mounted ? ` · ${formatDateTimeLongID(now)} WIB` : ""}
+        </p>
+      </section>
+
+      {/* Kartu navigasi cepat ala desain: 3 kartu pastel (Pelanggan, Riwayat,
+          Laporan) — Kasir & Menu tetap ada di bottom nav. */}
+      <div className="grid grid-cols-3 gap-3 mb-5" role="navigation" aria-label="Pintasan cepat">
+        {QUICK_NAV.map((s) => (
+          <button
+            key={s.path}
+            type="button"
+            onClick={() => navigate(s.path)}
+            className={cn(
+              "sb-wiggle group relative overflow-hidden rounded-3xl bg-gradient-to-br p-3.5 sm:p-4 text-left ring-1 ring-inset shadow-[0_10px_30px_-20px_rgb(0_0_0/0.3)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]",
+              s.card
+            )}
+          >
+            <div className="pointer-events-none absolute -bottom-6 -right-6 size-16 rounded-full bg-white/50" aria-hidden="true" />
+            <span
+              className="relative size-10 sm:size-12 rounded-2xl bg-white/85 dark:bg-white/10 grid place-items-center text-xl sm:text-[1.7rem] leading-none shadow-sm"
+              aria-hidden="true"
+            >
+              {s.emoji}
             </span>
-          )}
-        </div>
-      )}
-
-      {/* Shortcut cepat — ikon warna-warni, goyang playful saat dihover */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-6">
-        {SHORTCUTS.map((s) => (
-          <ShortcutButton key={s.label} icon={s.icon} label={s.label} onClick={() => navigate(s.path)} chip={s.chip} primary={s.primary} />
+            <span className="relative mt-2.5 sm:mt-3 flex items-center justify-between gap-1 w-full">
+              <span className="text-[13px] sm:text-[15px] font-bold text-slate-700 dark:text-slate-200 whitespace-nowrap">{s.label}</span>
+              <span className="size-5 sm:size-6 shrink-0 rounded-full bg-white/85 dark:bg-white/10 grid place-items-center text-slate-600 dark:text-slate-300 transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+                <ChevronRight className="size-3 sm:size-3.5" />
+              </span>
+            </span>
+          </button>
         ))}
       </div>
 
       {error && <ErrorState message={error} onRetry={refresh} />}
 
-      {/* KPI — angka count-up + ikon goyang saat kartu dihover */}
+      {/* KPI 2×2 ala desain — tile emoji, angka besar, chip tren riil */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <StatCard label="Penjualan Hari Ini" value={formatIDR(animatedSales)} icon={Wallet} tone="success" loading={loading} hint={`Bulan ini: ${formatIDR(data?.salesThisMonth ?? 0)}`} wiggle />
-        <StatCard label="Transaksi Hari Ini" value={String(Math.round(animatedTx))} icon={ReceiptText} loading={loading} hint={`Bulan ini: ${data?.transactionsThisMonth ?? 0}`} wiggle />
-        <StatCard label="Rata-rata Transaksi" value={formatIDR(animatedAvg)} icon={ShoppingBasket} loading={loading} hint="Hari ini" wiggle />
-        <StatCard label="Item Terjual" value={formatQty(Math.round(animatedItems))} icon={Package} loading={loading} hint="Produk + jasa, hari ini" wiggle />
+        <DesignStatCard
+          emoji="🛍️"
+          tileClass="bg-blue-100/90 dark:bg-blue-500/15"
+          cardClass="from-sky-50 via-white to-blue-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          label={"Penjualan\nHari Ini"}
+          value={formatIDR(animatedSales)}
+          loading={loading}
+          chip={
+            <TrendChip icon="📈" className="text-slate-600 dark:text-slate-300">
+              {salesPct === null ? `Bulan ini ${formatIDR(data?.salesThisMonth ?? 0)}` : fmtDelta(salesPct)}
+            </TrendChip>
+          }
+        />
+        <DesignStatCard
+          emoji="🧾"
+          tileClass="bg-violet-100/90 dark:bg-violet-500/15"
+          cardClass="from-violet-50 via-white to-purple-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          label={"Transaksi\nHari Ini"}
+          value={String(Math.round(animatedTx))}
+          loading={loading}
+          chip={
+            <TrendChip icon="📊">
+              {txPct === null ? `Bulan ini ${data?.transactionsThisMonth ?? 0} transaksi` : fmtDelta(txPct)}
+            </TrendChip>
+          }
+        />
+        <DesignStatCard
+          emoji="🧮"
+          tileClass="bg-emerald-100/90 dark:bg-emerald-500/15"
+          cardClass="from-emerald-50 via-white to-teal-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          label={"Rata-rata\nTransaksi"}
+          value={formatIDR(animatedAvg)}
+          loading={loading}
+          chip={
+            <TrendChip icon="↗️">
+              {avgPct === null ? "Hari ini" : fmtDelta(avgPct)}
+            </TrendChip>
+          }
+        />
+        <DesignStatCard
+          emoji="📦"
+          tileClass="bg-amber-100/90 dark:bg-amber-500/15"
+          cardClass="from-amber-50 via-white to-orange-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          label="Item Terjual"
+          value={formatQty(Math.round(animatedItems))}
+          loading={loading}
+          chip={<TrendChip icon="📦">Produk + jasa, hari ini</TrendChip>}
+        />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         {/* Grafik 7 hari */}
-        <Card className="lg:col-span-2 min-w-0">
+        <Card className="lg:col-span-2 min-w-0 rounded-3xl">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -151,7 +226,7 @@ export default function DashboardView() {
                 <CardDescription>Total penjualan harian (transaksi selesai)</CardDescription>
               </div>
               {!loading && data?.salesLast7Days ? (
-                <Badge variant="secondary" className="tabular shrink-0">
+                <Badge variant="secondary" className="tabular shrink-0 rounded-full">
                   Σ {formatIDR(weekTotal)}
                 </Badge>
               ) : null}
@@ -163,13 +238,13 @@ export default function DashboardView() {
         </Card>
 
         {/* Stok menipis */}
-        <Card>
+        <Card className="rounded-3xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <TriangleAlert className="size-4 text-amber-500" aria-hidden="true" />
               Stok Menipis
               {!!data?.lowStockCount && (
-                <Badge variant="secondary" className="tabular">{data.lowStockCount}</Badge>
+                <Badge variant="secondary" className="tabular rounded-full">{data.lowStockCount}</Badge>
               )}
             </CardTitle>
             <CardDescription>
@@ -186,13 +261,13 @@ export default function DashboardView() {
                 {data.lowStockItems.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center justify-between gap-3 text-sm rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/40"
+                    className="flex items-center justify-between gap-3 text-sm rounded-2xl bg-muted/40 px-3 py-2.5 transition-colors hover:bg-muted/70"
                   >
                     <span className="truncate">{item.name}</span>
                     <Badge
                       variant="outline"
                       className={cn(
-                        "shrink-0 tabular",
+                        "shrink-0 tabular rounded-full",
                         item.stockQty <= 0
                           ? "border-destructive/40 text-destructive"
                           : "border-amber-500/40 text-amber-600 dark:text-amber-400"
@@ -207,7 +282,7 @@ export default function DashboardView() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full mt-4"
+              className="w-full mt-4 rounded-full"
               onClick={() => navigate(data?.lowStockCount ? "/app/products/stok" : "/app/products")}
             >
               <Package className="size-4" />
@@ -219,14 +294,14 @@ export default function DashboardView() {
 
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         {/* Transaksi terbaru */}
-        <Card className="lg:col-span-2 min-w-0">
+        <Card className="lg:col-span-2 min-w-0 rounded-3xl">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">Transaksi Terbaru</CardTitle>
                 <CardDescription>6 transaksi terakhir</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/app/transactions")}>
+              <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate("/app/transactions")}>
                 Semua transaksi
                 <ChevronRight className="size-4" />
               </Button>
@@ -245,7 +320,7 @@ export default function DashboardView() {
                 description="Mulai transaksi pertama Anda lewat halaman Kasir."
                 emoji="🛒"
                 action={
-                  <Button size="sm" onClick={() => navigate("/app/pos")}>
+                  <Button size="sm" className="rounded-full" onClick={() => navigate("/app/pos")}>
                     <ScanBarcode className="size-4" />
                     Buka Kasir
                   </Button>
@@ -281,7 +356,7 @@ export default function DashboardView() {
         </Card>
 
         {/* Item terlaris */}
-        <Card>
+        <Card className="rounded-3xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Terlaris Bulan Ini</CardTitle>
             <CardDescription>Produk &amp; jasa paling banyak terjual</CardDescription>
@@ -301,7 +376,7 @@ export default function DashboardView() {
                   <li key={`${item.id}-${i}`} className="flex items-center gap-3 text-sm">
                     <RankBadge rank={i + 1} />
                     <span className="truncate flex-1">{item.name}</span>
-                    <Badge variant="secondary" className="shrink-0">
+                    <Badge variant="secondary" className="shrink-0 rounded-full">
                       {item.type === "PRODUCT" ? "Produk" : "Jasa"}
                     </Badge>
                     <span className="text-xs text-muted-foreground tabular shrink-0">{formatQty(item.qty)}×</span>
@@ -316,57 +391,30 @@ export default function DashboardView() {
   )
 }
 
-// Shortcut dashboard — setiap tujuan punya warna ikon sendiri (playful namun
-// tetap dalam sistem warna Tailwind), ikon goyang saat tombol dihover.
-const SHORTCUTS: {
-  icon: React.ComponentType<{ className?: string }>;
+// Navigasi cepat ala desain — 3 kartu pastel dengan emoji 3D-look & chevron.
+const QUICK_NAV: {
+  emoji: string;
   label: string;
   path: string;
-  chip: string;
-  primary?: boolean;
+  /** Kelas gradien kartu (ringan: murni CSS, tanpa gambar). */
+  card: string;
 }[] = [
   {
-    icon: ScanBarcode,
-    label: "Transaksi Baru",
-    path: "/app/pos",
-    chip: "bg-gradient-to-br from-primary to-sky-500 text-primary-foreground ring-primary/40 shadow-lg shadow-primary/25",
-    primary: true,
+    emoji: "👥",
+    label: "Pelanggan",
+    path: "/app/customers",
+    card: "from-emerald-50 to-emerald-100 ring-emerald-200/60 dark:from-slate-800 dark:to-slate-800 dark:ring-white/10",
   },
-  { icon: Package, label: "Produk", path: "/app/products", chip: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/25" },
-  { icon: Users, label: "Pelanggan", path: "/app/customers", chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/25" },
-  { icon: ReceiptText, label: "Riwayat", path: "/app/transactions", chip: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/25" },
-  { icon: ChartColumn, label: "Laporan", path: "/app/reports", chip: "bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/25" },
+  {
+    emoji: "🧾",
+    label: "Riwayat",
+    path: "/app/transactions",
+    card: "from-amber-50 to-orange-100 ring-amber-200/60 dark:from-slate-800 dark:to-slate-800 dark:ring-white/10",
+  },
+  {
+    emoji: "📊",
+    label: "Laporan",
+    path: "/app/reports",
+    card: "from-rose-50 to-rose-100 ring-rose-200/60 dark:from-slate-800 dark:to-slate-800 dark:ring-white/10",
+  },
 ]
-
-function ShortcutButton({
-  icon: Icon,
-  label,
-  onClick,
-  chip,
-  primary,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  onClick: () => void
-  chip: string
-  primary?: boolean
-}) {
-  return (
-    <Button
-      variant={primary ? "default" : "outline"}
-      onClick={onClick}
-      className="sb-wiggle h-auto py-3 flex-col gap-1.5 text-xs sm:text-sm font-medium rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98]"
-    >
-      <span
-        className={cn(
-          "size-8 rounded-lg ring-1 flex items-center justify-center transition-transform",
-          chip
-        )}
-        aria-hidden="true"
-      >
-        <Icon className="sb-wiggle-target size-4.5" />
-      </span>
-      {label}
-    </Button>
-  )
-}

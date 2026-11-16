@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   BarChart3,
   ChartColumn,
+  ChevronRight,
   ClipboardCheck,
   Coins,
   FolderKanban,
@@ -346,38 +347,50 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
 
           <div className="flex-1 flex flex-col min-w-0">
             {/* Topbar — kaca frosted. Di POS mobile disembunyikan: header brand
-                ala referensi (logo + sapaan + avatar) dirender oleh POS itu sendiri. */}
+                ala referensi (logo + sapaan + avatar) dirender oleh POS itu sendiri.
+                Mobile (< lg): transparan tanpa border — menu + judul duduk di ATAS
+                pill putih rounded ala desain; latar gradien halus dari <main>. */}
             <header className={cn(
               "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 h-14 lg:h-16 px-3 sm:px-5 border-b border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 no-print",
+              "max-lg:border-b-0 max-lg:bg-transparent max-lg:supports-[backdrop-filter]:bg-transparent",
               posMode && "max-lg:hidden"
             )}>
-              {showNavDrawer && (
-                <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Buka menu navigasi">
-                      <Menu className="size-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="p-0 w-72 bg-sidebar/95 backdrop-blur-xl supports-[backdrop-filter]:bg-sidebar/90 text-sidebar-foreground border-sidebar-border">
-                    <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
-                    <SheetDescription className="sr-only">
-                      Pilih halaman untuk dibuka dari daftar menu di bawah.
-                    </SheetDescription>
-                    <SidebarContent
-                      user={user}
-                      nav={nav}
-                      path={path}
-                      navigate={(p) => {
-                        navigate(p)
-                        setDrawerOpen(false)
-                      }}
-                      onLogout={logout}
-                      alertCount={stockAlerts?.count ?? 0}
-                    />
-                  </SheetContent>
-                </Sheet>
+              {/* Pill putih ala desain: hamburger + judul dalam satu kapsul
+                  rounded (mobile); di desktop judul polos semula. */}
+              {showNavDrawer ? (
+                <div className="flex items-center gap-0.5 rounded-2xl bg-card pl-1 pr-4 py-1 shadow-sm ring-1 ring-black/[0.03] min-w-0 max-w-[75%]">
+                  <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label="Buka menu navigasi" className="size-9">
+                        <Menu className="size-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                      side="left"
+                      className="p-0 w-[304px] border-0 text-foreground bg-gradient-to-b from-sky-100 via-slate-50 to-indigo-100 dark:from-sidebar dark:via-sidebar dark:to-sidebar dark:text-sidebar-foreground"
+                    >
+                      <SheetTitle className="sr-only">Menu navigasi</SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Pilih halaman untuk dibuka dari daftar menu di bawah.
+                      </SheetDescription>
+                      <MobileNavContent
+                        user={user}
+                        nav={nav}
+                        path={path}
+                        navigate={(p) => {
+                          navigate(p)
+                          setDrawerOpen(false)
+                        }}
+                        onLogout={logout}
+                        alertCount={stockAlerts?.count ?? 0}
+                      />
+                    </SheetContent>
+                  </Sheet>
+                  <h2 className="font-bold text-lg tracking-tight truncate">{title}</h2>
+                </div>
+              ) : (
+                <h2 className="font-semibold text-base lg:text-lg truncate">{title}</h2>
               )}
-              <h2 className="font-semibold text-base lg:text-lg truncate">{title}</h2>
               <div className="flex-1" />
               {user.tenant && (
                 <div className="hidden md:flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 backdrop-blur-sm pl-3 pr-3.5 py-1.5 max-w-[280px]">
@@ -390,8 +403,10 @@ export default function AppShell({ initialUser }: { initialUser: SessionUserDTO 
               <UserMenu user={user} onProfile={() => navigate("/app/profile")} onLogout={logout} isAdmin={user.role === "SUPER_ADMIN"} />
             </header>
 
-            {/* Konten — pb ekstra di bawah lg memberi ruang untuk bottom nav */}
-            <main className="flex-1 p-4 sm:p-5 lg:p-6 xl:p-8 max-lg:pb-24 max-w-full">
+            {/* Konten — pb ekstra di bawah lg memberi ruang untuk bottom nav.
+                Mobile: latar gradien biru-lavender lembut ala desain (dark mode
+                tetap polos). */}
+            <main className="flex-1 p-4 sm:p-5 lg:p-6 xl:p-8 max-lg:pb-24 max-w-full max-lg:bg-gradient-to-b max-lg:from-sky-100 max-lg:via-indigo-50/70 max-lg:to-indigo-100 dark:max-lg:from-transparent dark:max-lg:via-transparent dark:max-lg:to-transparent">
               <div key={path} className="sb-fade-in">
                 {view}
               </div>
@@ -476,10 +491,10 @@ function BottomNav({
   return (
     <nav
       aria-label="Navigasi cepat"
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/60 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 shadow-[0_-8px_24px_-16px_rgb(0_0_0/0.18)] no-print"
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-xl supports-[backdrop-filter]:bg-card/90 shadow-[0_-8px_30px_-12px_rgb(0_0_0/0.18)] rounded-t-[1.75rem] no-print"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-5 max-w-lg mx-auto h-16">
+      <div className="grid grid-cols-5 max-w-lg mx-auto h-[4.25rem] items-center px-1">
         {items.map((it) => {
           const active = isActive(it)
           return (
@@ -489,32 +504,38 @@ function BottomNav({
               onClick={() => navigate(it.path)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative flex flex-col items-center justify-center gap-1 transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-ring",
+                "flex flex-col items-center justify-center gap-1 transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-ring",
                 active ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {active && (
-                <span className="absolute top-1.5 size-1 rounded-full bg-primary" aria-hidden="true" />
-              )}
-              <it.icon className="size-5" aria-hidden="true" />
-              <span className={cn("text-[10.5px] leading-none", active ? "font-semibold" : "font-medium")}>
-                {it.label}
+              {/* Pill highlight ala desain: kapsul lembut di belakang ikon+label */}
+              <span
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-1.5 min-w-[64px] transition-colors",
+                  active && "bg-primary/10"
+                )}
+              >
+                <it.icon className="size-5" aria-hidden="true" />
+                <span className={cn("text-[10.5px] leading-none", active ? "font-bold" : "font-medium")}>
+                  {it.label}
+                </span>
               </span>
             </button>
           )
         })}
         <button
-            type="button"
-            onClick={onOpenMenu}
-            aria-label={alertCount > 0 ? `Buka menu navigasi lengkap — ${alertCount} produk stok menipis` : "Buka menu navigasi lengkap"}
-            aria-haspopup="dialog"
-            className="relative flex flex-col items-center justify-center gap-1 text-muted-foreground transition-transform active:scale-95 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          >
+          type="button"
+          onClick={onOpenMenu}
+          aria-label={alertCount > 0 ? `Buka menu navigasi lengkap — ${alertCount} produk stok menipis` : "Buka menu navigasi lengkap"}
+          aria-haspopup="dialog"
+          className="flex flex-col items-center justify-center gap-1 text-muted-foreground transition-transform active:scale-95 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <span className="flex flex-col items-center justify-center gap-1 rounded-2xl px-4 py-1.5 min-w-[64px]">
             <span className="relative">
               <Menu className="size-5" aria-hidden="true" />
               {alertCount > 0 && (
                 <span
-                  className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9.5px] font-bold leading-none flex items-center justify-center tabular-nums ring-2 ring-background"
+                  className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9.5px] font-bold leading-none flex items-center justify-center tabular-nums ring-2 ring-card"
                   aria-hidden="true"
                 >
                   {alertCount > 99 ? "99+" : alertCount}
@@ -522,7 +543,8 @@ function BottomNav({
               )}
             </span>
             <span className="text-[10.5px] leading-none font-medium">Menu</span>
-          </button>
+          </span>
+        </button>
       </div>
     </nav>
   )
@@ -619,3 +641,114 @@ function SidebarContent({
 
 /* ThemeToggle & UserMenu diekstrak ke ./user-menu — dipakai bersama
    topbar desktop dan header mobile POS. */
+
+/* Drawer navigasi mobile (ponsel/tablet) — desain terang ala referensi:
+   logo + "Serbabisa / POS Kasir", tiap item punya tile ikon rounded, item
+   AKTIF = pill gradien biru + chevron + garis aksen di tepi kiri, kartu
+   profil + tombol keluar di dasar. Desktop sidebar (navy) tidak berubah. */
+function MobileNavContent({
+  user,
+  nav,
+  path,
+  navigate,
+  onLogout,
+  alertCount,
+}: {
+  user: SessionUserDTO
+  nav: NavItem[]
+  path: string
+  navigate: (p: string) => void
+  onLogout: () => void
+  alertCount: number
+}) {
+  const isActive = (item: NavItem) =>
+    item.end
+      ? path === item.path || path === `${item.path}/` || path === "" || path === "/"
+      : path.startsWith(item.path)
+
+  return (
+    <div className="relative flex flex-col h-full overflow-hidden">
+      {/* Blob dekoratif lembut ala desain (murni visual) */}
+      <div className="pointer-events-none absolute -top-20 -left-16 size-52 rounded-full bg-white/70 blur-2xl" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-16 -right-14 size-56 rounded-full bg-blue-300/40 blur-2xl" aria-hidden="true" />
+
+      {/* Logo + nama produk */}
+      <div className="relative flex items-center gap-3 px-5 pt-6 pb-4 shrink-0">
+        <img src="/logo-icon.png" alt="Logo Serbabisa" className="size-11 w-auto drop-shadow" />
+        <div className="min-w-0">
+          <p className="text-xl font-extrabold tracking-tight text-foreground truncate">
+            Serba<span className="text-primary">bisa</span>
+          </p>
+          <p className="text-xs font-medium text-muted-foreground truncate">
+            {user.role === "SUPER_ADMIN" ? "Super Admin" : "POS Kasir"}
+          </p>
+        </div>
+      </div>
+
+      <nav className="relative flex-1 overflow-y-auto px-3 pb-3 pt-1 space-y-1" aria-label="Navigasi utama">
+        {nav.map((item) => {
+          const active = isActive(item)
+          return (
+            <div key={item.path} className="relative">
+              {/* Garis aksen di tepi kiri item aktif */}
+              {active && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+              )}
+              <button
+                onClick={() => navigate(item.path)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "sb-wiggle relative w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-all",
+                  active
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold shadow-lg shadow-blue-500/30"
+                    : "text-foreground/90 hover:bg-white/80 active:bg-white"
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-10 shrink-0 rounded-xl grid place-items-center",
+                    active ? "bg-white/20" : "bg-primary/[0.07] text-primary"
+                  )}
+                >
+                  <item.icon className={cn("sb-wiggle-target size-5", active ? "text-white" : "")} aria-hidden="true" />
+                </span>
+                <span className="truncate text-[15px] font-semibold">{item.label}</span>
+                {item.path === "/app/products" && alertCount > 0 && (
+                  <span
+                    className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold leading-none flex items-center justify-center tabular-nums shrink-0"
+                    title={`${alertCount} produk stok menipis`}
+                    aria-label={`${alertCount} produk stok menipis`}
+                  >
+                    {alertCount > 99 ? "99+" : alertCount}
+                  </span>
+                )}
+                {active && <ChevronRight className="size-4.5 ml-auto shrink-0" aria-hidden="true" />}
+              </button>
+            </div>
+          )
+        })}
+      </nav>
+
+      {/* Kartu profil + keluar */}
+      <div className="relative px-3 pb-4 pt-1 shrink-0">
+        <div className="flex items-center gap-3 rounded-2xl bg-card/90 ring-1 ring-black/[0.04] shadow-sm px-3 py-2.5">
+          <div className="size-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0" aria-hidden="true">
+            {user.fullName.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-foreground truncate">{user.fullName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+          </div>
+          <button
+            onClick={onLogout}
+            className="p-2 rounded-xl ring-1 ring-black/[0.05] bg-white text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            aria-label="Keluar dari aplikasi"
+            title="Keluar"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -36,7 +36,7 @@ export default function StockOpnameView() {
 
       {error && <ErrorState message={error} onRetry={refresh} />}
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-3xl border border-border/60 bg-card shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-4"><LoadingRows rows={6} /></div>
         ) : !(data?.data ?? []).length ? (

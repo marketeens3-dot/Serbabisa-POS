@@ -3,17 +3,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { History, Package, PackagePlus, Plus, Search, Trash2, Wrench } from "lucide-react";
+import { ArrowUpDown, History, LayoutGrid, MoreVertical, Package, PackagePlus, Pencil, Plus, Search, Trash2, Wrench, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { CatalogItemFormDialog } from "@/components/user/catalog-item-form";
 import { MovementHistoryDialog } from "@/components/user/movement-history-dialog";
 import { StockAdjustDialog } from "@/components/user/stock-adjust-dialog";
 import { itemEmoji, pastelFor } from "@/lib/catalog-visual";
+import { cn } from "@/lib/utils";
 import {
   EmptyState,
   ErrorState,
@@ -21,7 +22,6 @@ import {
   MoneyCell,
   PageHeader,
   PaginationControls,
-  UserStatusBadge,
 } from "@/components/app/shared";
 import { ExportMenu } from "@/components/app/export-menu";
 import { useApp } from "@/components/app/app-context";
@@ -29,6 +29,23 @@ import { useApi, useDebounced } from "@/hooks/use-api";
 import { api, ApiClientError } from "@/lib/api-client";
 import { formatIDR, formatQty } from "@/lib/format";
 import type { CatalogItemDTO, CategoryDTO, Paginated } from "@/lib/types";
+
+// Pill status ala desain: titik + "Aktif" hijau lembut / "Nonaktif" abu.
+function StatusPill({ active }: { active: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap",
+        active
+          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
+          : "bg-muted text-muted-foreground"
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", active ? "bg-emerald-500" : "bg-muted-foreground/60")} aria-hidden="true" />
+      {active ? "Aktif" : "Nonaktif"}
+    </span>
+  )
+}
 
 export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" | "SERVICE"; initialStatus?: string }) {
   const { navigate, refreshStockAlerts } = useApp()
@@ -95,32 +112,17 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
             ? "Kelola produk fisik — stok, harga, SKU, dan barcode."
             : "Kelola jasa layanan Anda — jasa tidak mengurangi stok."
         }
-        actions={
-          <>
-            <ExportMenu params={{ type: isProduct ? "products" : "services" }} />
-            <Button onClick={() => { setEditing(null); setFormOpen(true) }}>
-              <Plus className="size-4" />
-              {isProduct ? "Tambah Produk" : "Tambah Jasa"}
-            </Button>
-          </>
-        }
       />
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={isProduct ? "Cari nama / SKU / barcode…" : "Cari nama / SKU…"}
-            className="pl-9"
-            aria-label="Cari item"
-          />
-        </div>
+      {/* Baris 1 ala desain: pill kategori + tombol gradien Tambah */}
+      <div className="flex flex-wrap gap-2.5 mb-2.5">
         {isProduct && (
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="w-[170px]" aria-label="Filter kategori">
+            <SelectTrigger
+              className="flex-1 min-w-[140px] max-w-[220px] h-11 rounded-full bg-card shadow-sm ring-1 ring-black/[0.03] font-semibold"
+              aria-label="Filter kategori"
+            >
+              <LayoutGrid className="size-4 text-primary shrink-0" aria-hidden="true" />
               <SelectValue placeholder="Kategori" />
             </SelectTrigger>
             <SelectContent>
@@ -131,8 +133,35 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
             </SelectContent>
           </Select>
         )}
+        <Button
+          onClick={() => { setEditing(null); setFormOpen(true) }}
+          className="flex-1 min-w-[160px] max-w-[260px] h-11 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30 hover:from-blue-600 hover:to-blue-700 font-semibold"
+        >
+          <Plus className="size-4" />
+          {isProduct ? "Tambah Produk" : "Tambah Jasa"}
+        </Button>
+      </div>
+
+      {/* Baris 2: pencarian besar rounded-full + ekspor */}
+      <div className="flex gap-2.5 mb-2.5">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={isProduct ? "Cari nama / SKU / barcode…" : "Cari nama / SKU…"}
+            className="pl-10 h-11 rounded-full bg-card shadow-sm"
+            aria-label="Cari item"
+          />
+        </div>
+        <ExportMenu params={{ type: isProduct ? "products" : "services" }} />
+      </div>
+
+      {/* Baris 3: chip filter (status ⚡ + urutan) ala desain */}
+      <div className="flex gap-2.5 mb-4">
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[140px]" aria-label="Filter status">
+          <SelectTrigger className="flex-1 min-w-0 h-10 rounded-full bg-card shadow-sm text-sm font-medium" aria-label="Filter status">
+            <Zap className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +171,8 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={setSort}>
-          <SelectTrigger className="w-[150px]" aria-label="Urutkan">
+          <SelectTrigger className="flex-1 min-w-0 h-10 rounded-full bg-card shadow-sm text-sm font-medium" aria-label="Urutkan">
+            <ArrowUpDown className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
             <SelectValue placeholder="Urutkan" />
           </SelectTrigger>
           <SelectContent>
@@ -157,7 +187,7 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
 
       {error && <ErrorState message={error} onRetry={refresh} />}
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-3xl border border-border/60 bg-card shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-4"><LoadingRows rows={8} /></div>
         ) : !items.length ? (
@@ -177,6 +207,7 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                   action={
                     <Button
                       variant="outline"
+                      className="rounded-full"
                       onClick={() => { setSearch(""); setCategoryId("ALL"); setStatus(defaultStatus); setPage(1) }}
                     >
                       <Search className="size-4" />
@@ -205,7 +236,7 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                     : "Tambahkan jasa pertama Anda untuk mulai berjualan."
                 }
                 action={
-                  <Button onClick={() => { setEditing(null); setFormOpen(true) }}>
+                  <Button className="rounded-full" onClick={() => { setEditing(null); setFormOpen(true) }}>
                     <Plus className="size-4" />
                     {isProduct ? "Tambah Produk" : "Tambah Jasa"}
                   </Button>
@@ -214,29 +245,29 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
             )
           })()
         ) : (
-          // py-3 sel — baris data lebih lega di-densi; grid terasa profesional
-          <Table className="[&_td]:py-3 [&_th]:py-2.5">
+          // py-3.5 sel — baris data lega ala desain; kartu rounded-3xl
+          <Table className="[&_td]:py-3.5 [&_th]:py-3 [&_th]:text-xs [&_th]:font-bold">
             <TableHeader>
-              <TableRow>
-                <TableHead>Nama</TableHead>
-                <TableHead className="hidden md:table-cell">SKU / Barcode</TableHead>
-                <TableHead className="hidden sm:table-cell">Kategori</TableHead>
-                <TableHead className="text-right">Harga</TableHead>
-                {isProduct && <TableHead className="text-right">Stok</TableHead>}
-                {/* Status: tersembunyi di ponsel — produk nonaktif sudah tertanda
-                    "dinonaktifkan" di bawah nama, agar tabel muat tanpa terpotong. */}
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead>Nama Produk</TableHead>
+                <TableHead className="hidden lg:table-cell">SKU / Barcode</TableHead>
+                <TableHead className="hidden lg:table-cell">Kategori</TableHead>
+                <TableHead>Harga</TableHead>
+                {isProduct && <TableHead>Stok</TableHead>}
+                {/* Status: kini TAMPIL di ponsel ala desain (pill hijau ●). */}
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right"><span className="sr-only">Aksi</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.id} className={item.isLowStock ? "bg-amber-500/5" : undefined}>
-                  <TableCell className="font-medium max-w-[150px] sm:max-w-[220px]">
+                  <TableCell className="font-semibold max-w-[110px] sm:max-w-[180px] lg:max-w-[220px]">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {/* Thumbnail gambar produk (WebP) — fallback emoji seperti kasir */}
+                      {/* Thumbnail gambar produk (WebP) — fallback emoji, sudut
+                          lebih membulat (rounded-2xl) ala desain */}
                       <span
-                        className="relative size-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-base ring-1 ring-inset ring-border/50"
+                        className="relative size-11 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-lg ring-1 ring-inset ring-border/50"
                         style={{ background: pastelFor(item.id) }}
                         aria-hidden="true"
                       >
@@ -248,91 +279,85 @@ export default function CatalogView({ type, initialStatus }: { type: "PRODUCT" |
                       </span>
                       <div className="min-w-0">
                         <p className="truncate">{item.name}</p>
-                        {!item.isActive && <p className="text-xs text-muted-foreground">dinonaktifkan</p>}
+                        {!item.isActive && <p className="text-[11px] text-muted-foreground">dinonaktifkan</p>}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-xs tabular">
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-xs tabular">
                     {item.sku ?? "—"}
                     {item.barcode ? ` / ${item.barcode}` : ""}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {item.categoryName ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell>
                     {item.discountAmount > 0 ? (
-                      <div className="flex flex-col items-end leading-tight">
-                        <MoneyCell amount={item.sellingPrice - item.discountAmount} className="font-semibold" />
-                        <span className="text-[11px] text-muted-foreground line-through tabular">
+                      <div className="flex flex-col leading-tight">
+                        <MoneyCell amount={item.sellingPrice - item.discountAmount} className="font-bold whitespace-nowrap" />
+                        <span className="text-[11px] text-muted-foreground line-through tabular whitespace-nowrap">
                           {formatIDR(item.sellingPrice)}
                         </span>
                       </div>
                     ) : (
-                      <MoneyCell amount={item.sellingPrice} className="font-semibold" />
+                      <MoneyCell amount={item.sellingPrice} className="font-bold whitespace-nowrap" />
                     )}
                   </TableCell>
                   {isProduct && (
-                    <TableCell className="text-right">
+                    <TableCell>
                       {item.isLowStock ? (
-                        <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400 tabular">
+                        <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 px-2.5 py-1 text-xs font-bold tabular whitespace-nowrap">
                           {formatQty(item.stockQty)} {item.unit}
-                        </Badge>
+                        </span>
                       ) : (
-                        <span className="tabular text-muted-foreground">
+                        <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 px-2.5 py-1 text-xs font-bold tabular whitespace-nowrap">
                           {formatQty(item.stockQty)} {item.unit}
                         </span>
                       )}
                     </TableCell>
                   )}
-                  <TableCell className="hidden sm:table-cell">
-                    {item.isActive ? <UserStatusBadge status="ACTIVE" /> : <UserStatusBadge status="INACTIVE" />}
+                  <TableCell>
+                    <StatusPill active={item.isActive} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setEditing(item); setFormOpen(true) }}
-                        aria-label={`Ubah ${item.name}`}
-                      >
-                        Ubah
-                      </Button>
-                      {isProduct && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 px-0"
-                            onClick={() => setAdjusting(item)}
-                            aria-label={`Sesuaikan stok ${item.name}`}
-                            title="Sesuaikan stok (opname)"
-                          >
-                            <PackagePlus className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 px-0"
-                            onClick={() => setHistoryItem(item)}
-                            aria-label={`Riwayat stok ${item.name}`}
-                            title="Riwayat pergerakan stok"
-                          >
-                            <History className="size-4" />
-                          </Button>
-                        </>
-                      )}
-                      {item.isActive && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeactivating(item)}
-                          aria-label={`Nonaktifkan ${item.name}`}
-                        >
-                          <Trash2 className="size-4" />
+                    {/* Semua aksi dipindah ke menu kebab ⋯ ala desain — baris
+                        lebih bersih; aksi tetap lengkap & mudah dijangkau. */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8 rounded-full" aria-label={`Menu aksi untuk ${item.name}`}>
+                          <MoreVertical className="size-4" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => { setEditing(item); setFormOpen(true) }}>
+                          <Pencil className="size-4" />
+                          Ubah
+                        </DropdownMenuItem>
+                        {isProduct && (
+                          <>
+                            <DropdownMenuItem onClick={() => setAdjusting(item)}>
+                              <PackagePlus className="size-4" />
+                              Sesuaikan stok
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setHistoryItem(item)}>
+                              <History className="size-4" />
+                              Riwayat stok
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {item.isActive && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeactivating(item)}
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                            >
+                              <Trash2 className="size-4" />
+                              Nonaktifkan
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
