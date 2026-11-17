@@ -101,8 +101,8 @@ export default function DashboardView() {
         aria-label={`Sapaan untuk ${firstName}`}
       >
         {/* Dekorasi lembut */}
-        <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/50 dark:bg-white/10" aria-hidden="true" />
-        <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/35 dark:bg-white/5" aria-hidden="true" />
+        <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/75 dark:bg-white/10" aria-hidden="true" />
+        <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/60 dark:bg-white/5" aria-hidden="true" />
         <span className="pointer-events-none absolute top-4 right-24 text-amber-400 select-none" aria-hidden="true">✦</span>
 
         {/* Maskot toko */}
@@ -145,7 +145,7 @@ export default function DashboardView() {
               s.card
             )}
           >
-            <div className="pointer-events-none absolute -bottom-6 -right-6 size-16 rounded-full bg-white/50" aria-hidden="true" />
+            <div className="pointer-events-none absolute -bottom-6 -right-6 size-16 rounded-full bg-white/75 dark:bg-white/50" aria-hidden="true" />
             <span
               className="relative size-10 sm:size-12 rounded-2xl bg-white/85 dark:bg-white/10 grid place-items-center text-xl sm:text-[1.7rem] leading-none shadow-sm"
               aria-hidden="true"
@@ -170,6 +170,7 @@ export default function DashboardView() {
           emoji="🛍️"
           tileClass="bg-blue-100/90 dark:bg-blue-500/15"
           cardClass="from-sky-50 via-white to-blue-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          ornamentClass="bg-sky-200/60"
           label={"Penjualan\nHari Ini"}
           value={formatIDR(animatedSales)}
           loading={loading}
@@ -183,6 +184,7 @@ export default function DashboardView() {
           emoji="🧾"
           tileClass="bg-violet-100/90 dark:bg-violet-500/15"
           cardClass="from-violet-50 via-white to-purple-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          ornamentClass="bg-violet-200/60"
           label={"Transaksi\nHari Ini"}
           value={String(Math.round(animatedTx))}
           loading={loading}
@@ -196,6 +198,7 @@ export default function DashboardView() {
           emoji="🧮"
           tileClass="bg-emerald-100/90 dark:bg-emerald-500/15"
           cardClass="from-emerald-50 via-white to-teal-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          ornamentClass="bg-emerald-200/60"
           label={"Rata-rata\nTransaksi"}
           value={formatIDR(animatedAvg)}
           loading={loading}
@@ -209,6 +212,7 @@ export default function DashboardView() {
           emoji="📦"
           tileClass="bg-amber-100/90 dark:bg-amber-500/15"
           cardClass="from-amber-50 via-white to-orange-100 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 dark:ring-white/10"
+          ornamentClass="bg-amber-200/60"
           label="Item Terjual"
           value={formatQty(Math.round(animatedItems))}
           loading={loading}

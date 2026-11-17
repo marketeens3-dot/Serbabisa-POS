@@ -387,6 +387,7 @@ export function DesignStatCard({
   emoji,
   tileClass,
   cardClass,
+  ornamentClass,
   label,
   value,
   valueClass,
@@ -402,6 +403,9 @@ export function DesignStatCard({
   tileClass?: string
   /** Kelas gradien kartu (mis. "from-sky-50 to-blue-100"). */
   cardClass?: string
+  /** Kelas blob aksen di pojok kanan-bawah (mis. "bg-sky-200/55") —
+      hanya tampil di mode light agar ornamen terlihat jelas. */
+  ornamentClass?: string
   label: string
   value: string
   /** Kelas warna angka (mis. "text-orange-500"). */
@@ -424,9 +428,14 @@ export function DesignStatCard({
         cardClass
       )}
     >
-      {/* Blob dekoratif lembut di sudut kanan-bawah — murni visual */}
-      <div className="pointer-events-none absolute -bottom-8 -right-8 size-24 sm:size-28 rounded-full bg-white/45" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-12 right-14 size-20 rounded-full bg-white/30" aria-hidden="true" />
+      {/* Blob dekoratif lembut di sudut kanan-bawah — murni visual.
+          Light: diperkuat (white/45 & /30 di atas gradien pastel terang nyaris tak terlihat).
+          Dark: nilai dark: eksplisit menjaga tampilan dark persis seperti sebelumnya. */}
+      <div className="pointer-events-none absolute -bottom-8 -right-8 size-24 sm:size-28 rounded-full bg-white/70 dark:bg-white/45" aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-12 right-14 size-20 rounded-full bg-white/50 dark:bg-white/30" aria-hidden="true" />
+      {ornamentClass && (
+        <div className={cn("pointer-events-none absolute -bottom-6 -right-6 size-20 sm:size-24 rounded-full dark:hidden", ornamentClass)} aria-hidden="true" />
+      )}
 
       {cornerChip && (
         <div className="absolute top-3 right-3 z-10">{cornerChip}</div>
