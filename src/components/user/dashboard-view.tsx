@@ -103,13 +103,11 @@ export default function DashboardView() {
         {/* Dekorasi lembut */}
         <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/75 dark:bg-white/10" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/60 dark:bg-white/5" aria-hidden="true" />
-        <span className="pointer-events-none absolute top-4 right-24 text-amber-400 select-none" aria-hidden="true">✦</span>
 
         {/* Maskot toko */}
         <span className="pointer-events-none absolute right-3 bottom-0 text-[4.5rem] sm:text-8xl leading-none select-none drop-shadow-md" aria-hidden="true">
           🧋
         </span>
-        <span className="pointer-events-none absolute right-24 sm:right-28 top-6 text-xl select-none" aria-hidden="true">✨</span>
 
         <Button
           variant="ghost"

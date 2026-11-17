@@ -379,7 +379,7 @@ export function LoadingGrid({ cards = 8 }: { cards?: number }) {
 /* ============================================================
    DesignStatCard — kartu statistik ala desain referensi:
    gradien pastel rounded-3xl, tile emoji 3D, angka sangat besar,
-   sparkle ✦, blob dekoratif di sudut, dan chip kecil di bawah
+   blob dekoratif di sudut, dan chip kecil di bawah
    (mis. "+12% dari kemarin") atau chip pojok kanan-atas.
    Ringan: murni CSS + emoji, tanpa aset/gambar.
    ============================================================ */
@@ -462,7 +462,6 @@ export function DesignStatCard({
             </span>
             <p className="mt-3 text-sm sm:text-base font-bold leading-snug text-slate-700 dark:text-slate-200 whitespace-pre-line min-w-0">
               {label}
-              <span className="text-amber-400 ml-1 select-none" aria-hidden="true">✦</span>
             </p>
           </>
         ) : (
@@ -479,7 +478,6 @@ export function DesignStatCard({
             </span>
             <p className="text-sm sm:text-base font-bold leading-snug text-slate-700 dark:text-slate-200 whitespace-pre-line flex-1 min-w-0">
               {label}
-              <span className="text-amber-400 ml-1 select-none" aria-hidden="true">✦</span>
             </p>
           </div>
         )}
