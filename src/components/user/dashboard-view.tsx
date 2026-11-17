@@ -94,8 +94,8 @@ export default function DashboardView() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Hero sapaan ala desain — gradien biru, blob putih, maskot 🧋, tombol
-          muat ulang kecil di pojok. Menggantikan PageHeader + chip semangat. */}
+      {/* Hero sapaan ala desain — gradien biru, blob putih, maskot logo toko,
+          tombol muat ulang kecil di pojok. Menggantikan PageHeader + chip semangat. */}
       <section
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-200 via-indigo-100 to-blue-200 dark:from-slate-800 dark:via-slate-800/80 dark:to-slate-800 ring-1 ring-inset ring-white/60 dark:ring-white/10 p-5 sm:p-6 pr-24 sm:pr-28 mb-5"
         aria-label={`Sapaan untuk ${firstName}`}
@@ -104,10 +104,21 @@ export default function DashboardView() {
         <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/75 dark:bg-white/10" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/60 dark:bg-white/5" aria-hidden="true" />
 
-        {/* Maskot toko */}
-        <span className="pointer-events-none absolute right-3 bottom-0 text-[4.5rem] sm:text-8xl leading-none select-none drop-shadow-md" aria-hidden="true">
-          🧋
-        </span>
+        {/* Maskot toko — logo toko bila terpasang, fallback emoji boba */}
+        {user.tenant?.logoUrl ? (
+          <img
+            src={user.tenant.logoUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="pointer-events-none absolute right-3 bottom-2 size-16 sm:size-20 rounded-2xl object-contain bg-white/70 ring-1 ring-white/80 shadow-md select-none dark:bg-white/10 dark:ring-white/10"
+          />
+        ) : (
+          <span className="pointer-events-none absolute right-3 bottom-0 text-[4.5rem] sm:text-8xl leading-none select-none drop-shadow-md" aria-hidden="true">
+            🧋
+          </span>
+        )}
 
         <Button
           variant="ghost"
@@ -123,8 +134,8 @@ export default function DashboardView() {
         <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
           Halo, {firstName}! <span aria-hidden="true">👋</span>
         </p>
-        <p className="text-sm sm:text-base font-medium text-slate-600 dark:text-slate-300 mt-1">{spirit}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 tabular">
+        <p className="text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 mt-1">{spirit}</p>
+        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-1.5 tabular">
           {user.tenant?.businessName ?? "Toko Anda"}
           {mounted ? ` · ${formatDateTimeLongID(now)} WIB` : ""}
         </p>
