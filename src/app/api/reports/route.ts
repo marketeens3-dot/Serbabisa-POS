@@ -43,6 +43,24 @@ export async function GET(req: NextRequest) {
     // Net revenue = total - refund (transaksi REFUNDED penuh otomatis keluar karena status bukan COMPLETED).
     const completedTotal = (agg._sum.totalAmount ?? 0) - (agg._sum.refundedAmount ?? 0)
 
+    // Zero-fill: lengkapi SEMUA hari kalender dalam periode (tengah hari WIB
+    // sebagai anchor, aman dari geser zona) — hari tanpa penjualan = 0.
+    // Tanpa ini grafik "Tren harian" merender 1 bar raksasa saat penjualan
+    // hanya ada di beberapa hari (bar flex-1 memenuhi lebar kartu).
+    const dailyMap = new Map(daily.map((d) => [d.ymd, d]))
+    const filledDaily: { ymd: string; total: number; count: number }[] = []
+    {
+      const cur = new Date(`${dateFrom}T12:00:00+07:00`)
+      const end = new Date(`${dateTo}T12:00:00+07:00`)
+      // Batas aman: maks ~400 hari agar array tetap kecil.
+      for (let i = 0; i < 400 && cur <= end; i++) {
+        const ymd = cur.toISOString().slice(0, 10)
+        const hit = dailyMap.get(ymd)
+        filledDaily.push({ ymd, total: hit?.total ?? 0, count: hit?.count ?? 0 })
+        cur.setUTCDate(cur.getUTCDate() + 1)
+      }
+    }
+
     return NextResponse.json({
       period: { dateFrom, dateTo },
       summary: {
@@ -61,7 +79,7 @@ export async function GET(req: NextRequest) {
         qty: Math.round(((t._sum.quantity ?? 0) - (t._sum.refundedQty ?? 0)) * 1000) / 1000,
         revenue: t._sum.subtotal ?? 0,
       })),
-      daily: daily.map((d) => ({ ymd: d.ymd, total: d.total, count: d.count })),
+      daily: filledDaily,
     })
   } catch (err) {
     return handleApiError(err)
