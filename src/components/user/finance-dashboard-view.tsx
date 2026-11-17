@@ -53,7 +53,7 @@ export default function FinanceDashboardView() {
       </div>
 
       {/* Grafik kas 14 hari */}
-      <Card className="mb-6">
+      <Card ornamented className="mb-6">
         <CardContent className="pt-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-sm">Arus kas 14 hari terakhir</h3>

@@ -85,7 +85,7 @@ export default function CustomerDetailView({ customerId }: { customerId: string 
           />
 
           <div className="grid sm:grid-cols-3 gap-3 mb-5">
-            <Card>
+            <Card ornamented>
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center" aria-hidden="true">
                   <ReceiptText className="size-5" />
@@ -96,7 +96,7 @@ export default function CustomerDetailView({ customerId }: { customerId: string 
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card ornamented>
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center" aria-hidden="true">
                   <Users className="size-5" />
@@ -107,7 +107,7 @@ export default function CustomerDetailView({ customerId }: { customerId: string 
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card ornamented>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground">Kontak</p>
                 <p className="font-medium tabular">{customer.phone ? formatPhoneDisplay(customer.phone) : "—"}</p>

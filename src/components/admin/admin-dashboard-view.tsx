@@ -71,7 +71,7 @@ export default function AdminDashboardView() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
-        <Card className="lg:col-span-2 min-w-0">
+        <Card ornamented className="lg:col-span-2 min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Transaksi 7 Hari Terakhir</CardTitle>
             <CardDescription>Seluruh tenant — data agregat</CardDescription>

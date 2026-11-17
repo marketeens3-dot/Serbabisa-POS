@@ -220,7 +220,7 @@ export default function DashboardView() {
 
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         {/* Grafik 7 hari */}
-        <Card className="lg:col-span-2 min-w-0 rounded-3xl">
+        <Card ornamented className="lg:col-span-2 min-w-0 rounded-3xl">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

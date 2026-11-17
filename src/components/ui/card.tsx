@@ -2,30 +2,42 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+function Card({
+  className,
+  ornamented,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & {
+  /** true = tampilkan blob dekoratif di sudut kanan-bawah. Hanya untuk kartu
+      display yang lega (grafik/statistik ringkasan) — bukan form/tabel/daftar. */
+  ornamented?: boolean
+}) {
   return (
     <div
       data-slot="card"
       className={cn(
-        // relative + isolate + overflow-hidden: kuncian blob ornamen di dalam kartu.
-        // isolate membuat -z-10 blob berada di ATAS latar kartu tapi DI BAWAH konten,
-        // sehingga konten tidak tertutup kabut putih.
-        "relative isolate overflow-hidden bg-card text-card-foreground flex flex-col gap-6 rounded-3xl border border-border/60 py-6 shadow-[0_10px_30px_-24px_rgb(0_0_0/0.25)]",
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-3xl border border-border/60 py-6 shadow-[0_10px_30px_-24px_rgb(0_0_0/0.25)]",
+        // ornamented: kunci blob di dalam kartu; isolate membuat -z-10 blob
+        // berada di ATAS latar kartu tapi DI BAWAH konten (konten tak tertutup).
+        ornamented && "relative isolate overflow-hidden",
         className
       )}
       {...props}
     >
-      {/* Blob dekoratif di sudut kanan-bawah — konsisten dengan kartu statistik.
-          Hanya light mode (dark:hidden) agar tampilan dark tidak berubah. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-10 -right-10 size-28 rounded-full bg-white/70 -z-10 dark:hidden"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-8 -right-8 size-24 rounded-full bg-primary/[0.09] -z-10 dark:hidden"
-      />
-      {props.children}
+      {ornamented && (
+        <>
+          {/* Hanya light mode (dark:hidden) agar tampilan dark tidak berubah. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-10 -right-10 size-28 rounded-full bg-white/70 -z-10 dark:hidden"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-8 -right-8 size-24 rounded-full bg-primary/[0.09] -z-10 dark:hidden"
+          />
+        </>
+      )}
+      {children}
     </div>
   )
 }

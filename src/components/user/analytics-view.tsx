@@ -126,7 +126,7 @@ export default function AnalyticsView() {
           </div>
 
           {/* Peak hours */}
-          <Card>
+          <Card ornamented>
             <CardContent className="pt-5">
               <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Clock className="size-4 text-primary" />Jam ramai pelanggan</h3>
               <div className="flex items-end gap-1 h-32 border-b border-border" role="img" aria-label="Distribusi transaksi per jam">
