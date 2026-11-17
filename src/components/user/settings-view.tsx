@@ -215,7 +215,9 @@ export default function SettingsView() {
                   <div className="space-y-2 min-w-0">
                     <p className="text-sm font-medium">Logo toko</p>
                     <p className="text-xs text-muted-foreground">PNG/JPG/WEBP hingga 10MB — otomatis dikecilkan &amp; dikompres ke WebP (hasil ≤ 300KB).</p>
-                    <div className="flex gap-2">
+                    {/* flex-wrap: tombol tidak boleh meluap keluar kartu di layar sempit
+                        (base Button memakai shrink-0 + whitespace-nowrap). */}
+                    <div className="flex flex-wrap gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                         {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
                         {uploading ? "Mengunggah…" : "Unggah logo"}
@@ -345,7 +347,7 @@ export default function SettingsView() {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button type="submit" disabled={savingWa}>
                     {savingWa ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                     Simpan template
