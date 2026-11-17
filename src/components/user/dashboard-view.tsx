@@ -100,7 +100,8 @@ export default function DashboardView() {
         className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-200 via-indigo-100 to-blue-200 dark:from-slate-800 dark:via-slate-800/80 dark:to-slate-800 ring-1 ring-inset ring-white/60 dark:ring-white/10 p-5 sm:p-6 pr-24 sm:pr-28 mb-5"
         aria-label={`Sapaan untuk ${firstName}`}
       >
-        {/* Dekorasi lembut */}
+        {/* Dekorasi lembut — blob putih di belakang teks (teks dibuat relative
+            agar terlukis di atas blob; tanpa ini teks tampak pudar tertimpa). */}
         <div className="pointer-events-none absolute -top-10 -right-6 size-28 rounded-full bg-white/75 dark:bg-white/10" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-14 left-1/3 size-32 rounded-full bg-white/60 dark:bg-white/5" aria-hidden="true" />
 
@@ -131,11 +132,11 @@ export default function DashboardView() {
           <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />
         </Button>
 
-        <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
+        <p className="relative text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
           Halo, {firstName}! <span aria-hidden="true">👋</span>
         </p>
-        <p className="text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 mt-1">{spirit}</p>
-        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-1.5 tabular">
+        <p className="relative text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 mt-1">{spirit}</p>
+        <p className="relative text-xs font-medium text-slate-700 dark:text-slate-300 mt-1.5 tabular">
           {user.tenant?.businessName ?? "Toko Anda"}
           {mounted ? ` · ${formatDateTimeLongID(now)} WIB` : ""}
         </p>
