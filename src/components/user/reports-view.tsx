@@ -202,9 +202,12 @@ export default function ReportsView() {
             />
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
+          {/* grid-cols-1 eksplisit: tanpa ini, kolom implisit "auto" mengikuti
+              min-content kartu Tren harian (30 label tanggal ≈ 1045px) dan
+              mendorong seluruh halaman scroll horizontal di mobile. */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
             {/* Tren harian — header dengan tile 📈 + rentang tanggal ala desain */}
-            <Card className="lg:col-span-2 rounded-3xl">
+            <Card className="min-w-0 lg:col-span-2 rounded-3xl">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
@@ -233,7 +236,7 @@ export default function ReportsView() {
             </Card>
 
             {/* Metode pembayaran — tile 👛 + baris bar ala desain */}
-            <Card className="rounded-3xl">
+            <Card className="min-w-0 rounded-3xl">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="size-11 shrink-0 rounded-2xl bg-purple-100/90 dark:bg-purple-500/15 grid place-items-center text-2xl leading-none" aria-hidden="true">

@@ -230,7 +230,7 @@ export default function DashboardView() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         {/* Grafik 7 hari */}
         <Card ornamented className="lg:col-span-2 min-w-0 rounded-3xl">
           <CardHeader className="pb-2">
@@ -306,7 +306,7 @@ export default function DashboardView() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         {/* Transaksi terbaru */}
         <Card className="lg:col-span-2 min-w-0 rounded-3xl">
           <CardHeader className="pb-2">

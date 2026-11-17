@@ -80,7 +80,7 @@ export function PosSuccess({
     <div className="max-w-5xl mx-auto">
       {/* Perayaan konfeti — sekali jalan saat layar sukses muncul */}
       <ConfettiBurst />
-      <div className="grid lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Kiri: konfirmasi sukses */}
         <div className="rounded-2xl border bg-card p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col items-center text-center">

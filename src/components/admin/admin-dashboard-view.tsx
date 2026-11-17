@@ -70,7 +70,7 @@ export default function AdminDashboardView() {
         <StatCard label="Penjualan Hari Ini" value={formatIDR(data?.salesToday ?? 0)} icon={Wallet} tone="success" loading={loading} hint={`Bulan ini: ${formatIDR(data?.salesThisMonth ?? 0)}`} />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5 mt-5">
         <Card ornamented className="lg:col-span-2 min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Transaksi 7 Hari Terakhir</CardTitle>
@@ -107,7 +107,7 @@ export default function AdminDashboardView() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4 lg:gap-5 mt-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5 mt-5">
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">

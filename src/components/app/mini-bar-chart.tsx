@@ -22,6 +22,10 @@ export function MiniBarChart({
 }) {
   const max = Math.max(1, ...data.map((d) => d.total));
   const hasData = data.some((d) => d.total > 0);
+  // Label tiap bar memakan ~29px min-content — dengan >12 bar (laporan 30 hari)
+  // tidak muat di layar 390px. Di mobile tampilkan hanya label tiap hari ke-5;
+  // mulai sm (≥640px) semua label kembali tampil.
+  const sparseLabels = data.length > 12;
   // Hari terlaris mendapat bar EMAS + bubble nilai bermahkota 👑 — ala desain.
   // Bubble hanya saat bar sedikit (≤12) agar di 30 bar laporan tidak bertabrakan.
   const bestIndex = hasData
@@ -75,7 +79,18 @@ export function MiniBarChart({
                   </div>
                 </div>
               </div>
-              <span className="text-[10px] text-muted-foreground truncate w-full text-center">{d.label}</span>
+              <span
+                className={cn(
+                  "text-[10px] text-muted-foreground truncate w-full text-center",
+                  sparseLabels && i % 5 !== 0 && "hidden sm:inline",
+                  // Label yang tampil di mobile diberi lebar minimum agar tidak
+                  // terpotong oleh lebar bar (~11px); jarak antar label ke-5
+                  // (~55px) menjamin tidak saling bertumpuk.
+                  sparseLabels && i % 5 === 0 && "min-w-[3rem]"
+                )}
+              >
+                {d.label}
+              </span>
             </div>
           )
         })}

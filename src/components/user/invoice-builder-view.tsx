@@ -218,13 +218,13 @@ export default function InvoiceBuilderView() {
       />
 
       {loading ? (
-        <div className="grid lg:grid-cols-[260px_1fr_360px] gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_360px] gap-5">
           <Skeleton className="h-64 rounded-xl" />
           <Skeleton className="h-96 rounded-xl" />
           <Skeleton className="h-96 rounded-xl" />
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[240px_minmax(0,1fr)_380px] gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_380px] gap-5 items-start">
           {/* Daftar template */}
           <Card className="p-2">
             <p className="text-xs font-semibold text-muted-foreground px-3 pt-2 pb-1.5 uppercase tracking-wide">Template</p>
