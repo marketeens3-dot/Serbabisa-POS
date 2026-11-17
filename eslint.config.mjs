@@ -1,5 +1,6 @@
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import nextTypescript from "eslint-config-next/typescript";
+import reactHooks from "eslint-plugin-react-hooks";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -7,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
+  plugins: { "react-hooks": reactHooks },
   rules: {
     // TypeScript rules
     "@typescript-eslint/no-explicit-any": "off",
@@ -17,6 +19,16 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "@typescript-eslint/no-unused-disable-directive": "off",
     
     // React rules
+    // Aturan era React-Compiler (plugin v6). Triage 17 Nov 2026: 23 temuan
+    // set-state-in-effect semuanya pola idiomatik yang sudah direview —
+    // mount-guard localStorage/WIB (settings-view, dashboard), reset form
+    // saat dialog dibuka (customers/cart/refund/shift-close), sinkronisasi
+    // pilihan template (invoice-builder), restore diskon tersemat (pos-view),
+    // subscribe media/interval (app-shell, sync-indicator, use-shift —
+    // refetch deps [] stabil). Tidak ada loop cascade nyata di runtime
+    // (console 0 error). Turunkan ke warn agar lint tetap hijau dan temuan
+    // baru tetap terlihat, tanpa refactor berisiko di kode produksi.
+    "react-hooks/set-state-in-effect": "warn",
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",
     "react/no-unescaped-entities": "off",

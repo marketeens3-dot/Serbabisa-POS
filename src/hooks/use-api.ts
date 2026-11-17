@@ -22,7 +22,14 @@ export function useApi<T>(path: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!path);
   const pathRef = useRef(path);
-  pathRef.current = path;
+  // Tulis ref di EFFECT, bukan saat render (aturan react-compiler: refs hanya
+  // boleh diubah di effect/event handler — aman untuk concurrent rendering;
+  // render bisa dibuang tanpa commit, tulis-during-render bisa bocor).
+  // Effect ini dideklarasikan SEBELUM effect fetch sehingga `load` selalu
+  // membaca path terbaru. Nilai awal ref sudah `path`, jadi mount aman.
+  useEffect(() => {
+    pathRef.current = path;
+  }, [path]);
 
   const load = useCallback(async () => {
     if (!pathRef.current) {
